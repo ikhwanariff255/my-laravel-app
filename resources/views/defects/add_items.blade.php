@@ -144,11 +144,14 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Description <span class="text-red-500">*</span></label>
-                        <textarea id="descriptionInput-{INDEX}" rows="2" class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500" placeholder="Details..." required></textarea>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-sm font-medium text-gray-700">Description <span class="text-red-500">*</span></label>
+                            <span id="word-count-{INDEX}" class="text-xs text-gray-400 font-medium">0 / 30 words</span>
+                        </div>
+                        <textarea id="descriptionInput-{INDEX}" rows="2" class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500" placeholder="Details (Max 30 words)..." required></textarea>
                     </div>
                     <div class="border-t pt-4">
-                        <label class="block font-bold text-blue-600 mb-2">Upload Evidence (Max 3) <span class="text-red-500">*</span></label>
+                        <label class="block font-bold text-blue-600 mb-2">Upload Evidence (Max 4) <span class="text-red-500">*</span></label>
                         <input type="file" id="ui-image-input-{INDEX}" accept="image/*" multiple class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
                         <div id="preview-container-{INDEX}" class="flex gap-3 mt-3 flex-wrap"></div>
                         <div id="upload-status-{INDEX}" class="mt-2 text-blue-500 text-sm hidden"><i class="fas fa-spinner fa-spin mr-1"></i> Processing images...</div>
@@ -367,7 +370,16 @@
         if (!$(`#categorySelect-${idx}`).val()) return false;
         if (!$(`#typeSelect-${idx}`).val()) return false;
         if (!$(`#defectSelect-${idx}`).val()) return false;
-        if (!$(`#descriptionInput-${idx}`).val()) return false;
+        
+        // Semak description & had 30 words
+        const descVal = $(`#descriptionInput-${idx}`).val().trim();
+        if (!descVal) return false;
+        let wordCount = descVal === '' ? 0 : descVal.split(/\s+/).length;
+        if (wordCount > 30) {
+            alert('Description cannot exceed 30 words.');
+            return false;
+        }
+
         if (!blockDataArrays[idx] || blockDataArrays[idx].files.length === 0) return false;
         return true;
     }
@@ -434,8 +446,8 @@
             const files = e.target.files;
             if (!files || files.length === 0) return;
             let dt = blockDataArrays[idx];
-            if (dt.items.length + files.length > 3) {
-                alert(`Maximum 3 images allowed.`); this.value = ''; return;
+            if (dt.items.length + files.length > 4) {
+                alert(`Maximum 4 images allowed.`); this.value = ''; return;
             }
             document.getElementById(`upload-status-${idx}`).classList.remove('hidden');
             uiInput.disabled = true;
@@ -451,6 +463,30 @@
             document.getElementById(`upload-status-${idx}`).classList.add('hidden');
             uiInput.disabled = false;
         });
+
+        // --- TAMBAH KOD INI DI DALAM initBlockLogic(idx) ---
+    const descInput = document.getElementById(`descriptionInput-${idx}`);
+    const wordCounter = document.getElementById(`word-count-${idx}`);
+
+    descInput.addEventListener('input', function() {
+        let text = this.value.trim();
+        // Pecahkan teks mengikut ruang kosong (space)
+        let words = text === '' ? [] : text.split(/\s+/);
+        
+        if (words.length > 30) {
+            // Potong teks balik kepada 30 patah perkataan sahaja jika lebih
+            this.value = words.slice(0, 30).join(' ');
+            words = words.slice(0, 30);
+        }
+        
+        wordCounter.textContent = `${words.length} / 30 words`;
+        if (words.length >= 30) {
+            wordCounter.classList.add('text-red-500', 'font-bold');
+        } else {
+            wordCounter.classList.remove('text-red-500', 'font-bold');
+        }
+    });
+
     }
 
     function processAutoCrop(file) {

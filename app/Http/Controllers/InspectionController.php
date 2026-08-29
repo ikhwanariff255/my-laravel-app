@@ -82,6 +82,9 @@ class InspectionController extends Controller
             'type' => $request->type,
             'img' => $imgPath,
             'layout_img' => $layoutPath,
+            'cus_no' => $request->cus_no,
+            'cus_email' => $request->cus_email,
+            'inspection_date' => $request->inspection_date,
         ]);
 
         // Simpan multiple staf ke pivot table
@@ -112,6 +115,9 @@ class InspectionController extends Controller
         $request->validate([
             'title' => 'required|string|max:255',
             'clientname' => 'required|string|max:255',
+            'cus_no' => 'nullable|string|max:255',
+            'cus_email' => 'nullable|email|max:255',
+            'inspection_date' => 'nullable|date',
             'user_id' => 'required|array',
             'user_id.*' => 'exists:users,id',
             'address' => 'required|string',
@@ -156,9 +162,13 @@ class InspectionController extends Controller
             }
         }
 
+        // Kemaskini data termasuk medan baru
         $inspection->update([
             'title' => $request->title,
             'clientname' => $request->clientname,
+            'cus_no' => $request->cus_no,
+            'cus_email' => $request->cus_email,
+            'inspection_date' => $request->inspection_date,
             'address' => $request->address,
             'state' => $request->state,
             'type' => $request->type,

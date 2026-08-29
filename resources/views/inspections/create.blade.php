@@ -36,23 +36,41 @@
                     <input type="text" name="clientname" value="{{ old('clientname') }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Client's full name" required>
                 </div>
 
+                <!-- Inspection Date -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Inspection Date</label>
+                    <input type="date" name="inspection_date" value="{{ old('inspection_date', date('Y-m-d')) }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 outline-none bg-white" required>
+                </div>
+
+                <!-- Customer Contact No (cus_no) -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Contact No</label>
+                    <input type="text" name="cus_no" value="{{ old('cus_no') }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="010-2034055">
+                </div>
+
+                <!-- Customer Email (cus_email) -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                    <input type="email" name="cus_email" value="{{ old('cus_email') }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="client@example.com">
+                </div>
+
                 <!-- Assigned Staff (Multiple Selection) -->
-                    <div class="col-span-1 md:col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Assigned Staff In Charge (Select one or more)</label>
-                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 border border-gray-300 rounded-lg bg-gray-50 max-h-48 overflow-y-auto">
-                            @foreach($staffs as $staff)
-                                <label class="flex items-center space-x-3 cursor-pointer">
-                                    <input type="checkbox" name="user_id[]" value="{{ $staff->id }}" 
-                                        {{ (is_array(old('user_id')) && in_array($staff->id, old('user_id'))) ? 'checked' : '' }}
-                                        class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                                    <span class="text-sm text-gray-700 font-medium">{{ $staff->name }}</span>
-                                </label>
-                            @endforeach
-                        </div>
-                        @error('user_id')
-                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
-                        @enderror
+                <div class="col-span-1 md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Assigned Staff In Charge (Select one or more)</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 border border-gray-300 rounded-lg bg-gray-50 max-h-48 overflow-y-auto">
+                        @foreach($staffs as $staff)
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" name="user_id[]" value="{{ $staff->id }}" 
+                                    {{ (is_array(old('user_id')) && in_array($staff->id, old('user_id'))) ? 'checked' : '' }}
+                                    class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                <span class="text-sm text-gray-700 font-medium">{{ $staff->name }}</span>
+                            </label>
+                        @endforeach
                     </div>
+                    @error('user_id')
+                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                    @enderror
+                </div>
 
                 <!-- Property Type -->
                 <div>
@@ -105,16 +123,16 @@
                     </select>
                 </div>
 
-                <!-- ================= 1. HOUSE IMAGE (LANDSCAPE 4:3) ================= -->
+                <!-- ================= HOUSE IMAGE (PORTRAIT 3:4 UNTUK COVER PAGE) ================= -->
                 <div class="col-span-1 md:col-span-2 border-t border-gray-100 pt-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">House Image (Front View)</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">House Image (Front View for Cover Page)</label>
                     <input type="file" id="imageInput" accept="image/*" class="w-full px-3 py-2 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
                     
                     <input type="hidden" name="cropped_image" id="croppedImageOutput">
 
                     <div id="cropperContainer" class="mt-4 hidden bg-gray-50 p-4 rounded-xl border border-dashed border-gray-300">
                         <div class="max-w-md mb-4 overflow-hidden">
-                            <img id="imagePreview" src="" alt="Preview" class="max-h-72 block">
+                            <img id="imagePreview" src="" alt="Preview" class="max-h-96 block">
                         </div>
                         <div class="flex items-center">
                             <button type="button" id="cropButton" class="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 shadow-sm">
@@ -125,7 +143,7 @@
                     </div>
                 </div>
 
-                <!-- ================= 2. LAYOUT PLAN (PORTRAIT 3:4) ================= -->
+                <!-- ================= LAYOUT PLAN (PORTRAIT 3:4) ================= -->
                 <div class="col-span-1 md:col-span-2 border-t border-gray-100 pt-6">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Layout Plan (Portrait / Vertical Rectangle)</label>
                     <input type="file" id="layoutInput" accept="image/*" class="w-full px-3 py-2 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100">
@@ -215,7 +233,7 @@
             populateCities(oldState, oldCity);
         }
 
-        // --- CROPPER FOR HOUSE IMAGE (4:3) ---
+        // --- CROPPER FOR HOUSE IMAGE (3:4 PORTRAIT FOR COVER PAGE) ---
         let cropper;
         const imageInput = document.getElementById('imageInput');
         const imagePreview = document.getElementById('imagePreview');
@@ -235,7 +253,7 @@
                         cropStatus.classList.add('hidden');
                         cropButton.textContent = "Confirm Crop House Image";
                         if (cropper) cropper.destroy();
-                        cropper = new Cropper(imagePreview, { aspectRatio: 4 / 3, viewMode: 1 });
+                        cropper = new Cropper(imagePreview, { aspectRatio: 3 / 4, viewMode: 1 });
                     };
                     reader.readAsDataURL(files[0]);
                 }
@@ -245,8 +263,8 @@
         if(cropButton) {
             cropButton.addEventListener('click', function () {
                 if (cropper) {
-                    const canvas = cropper.getCroppedCanvas({ width: 800, height: 600 });
-                    croppedImageOutput.value = canvas.toDataURL('image/jpeg', 0.8);
+                    const canvas = cropper.getCroppedCanvas({ width: 900, height: 1200 });
+                    croppedImageOutput.value = canvas.toDataURL('image/jpeg', 0.85);
                     cropStatus.classList.remove('hidden');
                     cropButton.textContent = "Re-Crop";
                 }
@@ -284,7 +302,7 @@
             cropLayoutButton.addEventListener('click', function () {
                 if (layoutCropper) {
                     const canvas = layoutCropper.getCroppedCanvas({ width: 600, height: 800 });
-                    croppedLayoutOutput.value = canvas.toDataURL('image/jpeg', 0.8);
+                    croppedLayoutOutput.value = canvas.toDataURL('image/jpeg', 0.85);
                     layoutCropStatus.classList.remove('hidden');
                     cropLayoutButton.textContent = "Re-Crop";
                 }

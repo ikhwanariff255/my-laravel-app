@@ -8,13 +8,16 @@ class Inspection extends Model
 {
     // Tambah 'user_id' di sini supaya Laravel benarkan ia disimpan
     protected $fillable = [
-        'user_id', 
-        'title', 
-        'clientname', 
-        'address', 
-        'state', 
-        'type', 
-        'img', 
+        'user_id',
+        'title',
+        'clientname',
+        'cus_no',
+        'cus_email',
+        'inspection_date',
+        'address',
+        'state',
+        'type',
+        'img',
         'layout_img'
     ];
 
