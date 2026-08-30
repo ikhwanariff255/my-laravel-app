@@ -3,6 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <title>Inspection Report - {{ $inspection->title }}</title>
+    
+    @php
+        // Helper function to bypass DomPDF file restrictions
+        if (!function_exists('getBase64Image')) {
+            function getBase64Image($path) {
+                if ($path && file_exists($path)) {
+                    $ext = pathinfo($path, PATHINFO_EXTENSION);
+                    $type = strtolower($ext);
+                    if ($type === 'jpg') $type = 'jpeg';
+                    
+                    $data = @file_get_contents($path);
+                    if ($data) {
+                        return 'data:image/' . $type . ';base64,' . base64_encode($data);
+                    }
+                }
+                return '';
+            }
+        }
+    @endphp
+
     <style>
         @page { 
             size: A4 portrait; 
@@ -59,9 +79,7 @@
         .val-col { width: 45%; }
         .map-col { width: 35%; text-align: center; vertical-align: middle; padding: 2px !important; }
         
-        .minimap-img { max-width: 160px; max-height: 120px; object-fit: cover; /* Tukar dari contain kepada cover */
-    object-position: center;
-    border: 1px solid #cbd5e0; }
+        .minimap-img { max-width: 160px; max-height: 120px; object-fit: cover; object-position: center; border: 1px solid #cbd5e0; }
         
         .evidence-container { width: 100%; text-align: center; padding: 10px 0; }
         .evidence-table { margin: 0 auto; border: none; }
@@ -95,7 +113,7 @@
                     @endphp
 
                     @if(file_exists($logoPath))
-                        <img src="{{ 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath)) }}" style="width: 100%; max-width: 240px; margin-bottom: 25px; display: block;" alt="Logo">
+                        <img src="{{ getBase64Image($logoPath) }}" style="width: 100%; max-width: 240px; margin-bottom: 25px; display: block;" alt="Logo">
                     @else
                         <div style="font-size: 22pt; font-weight: bold; margin-bottom: 25px;"><span style="color:#000;">DEFECT</span><span style="color:#f6ad55;">GURU</span></div>
                     @endif
@@ -140,10 +158,10 @@
                 
                 <!-- KANAN: Gambar Rumah (Col: img) -->
                 <td style="width: 58%; background-color: #e2e8f0; padding: 0; vertical-align: top;">
-                    @if(isset($inspection->img) && file_exists(public_path('storage/' . $inspection->img)))
-                        <img src="{{ public_path('storage/' . $inspection->img) }}" style="width: 100%; height: 1200px; object-fit: cover; display: block;">
+                    @if(!empty($inspection->local_cover) && file_exists($inspection->local_cover))
+                        <img src="{{ getBase64Image($inspection->local_cover) }}" style="width: 100%; height: 1200px; object-fit: cover; display: block;">
                     @elseif($inspection->layout_img && file_exists(public_path('storage/' . $inspection->layout_img)))
-                        <img src="{{ public_path('storage/' . $inspection->layout_img) }}" style="width: 100%; height: 1200px; object-fit: cover; display: block;">
+                        <img src="{{ getBase64Image(public_path('storage/' . $inspection->layout_img)) }}" style="width: 100%; height: 1200px; object-fit: cover; display: block;">
                     @endif
                 </td>
             </tr>
@@ -183,7 +201,7 @@
     <div class="section-title">Floor Plan</div>
     @if($inspection->layout_img && file_exists(public_path('storage/' . $inspection->layout_img)))
         <div class="plan-box">
-            <img src="{{ public_path('storage/' . $inspection->layout_img) }}" class="plan-img">
+            <img src="{{ getBase64Image(public_path('storage/' . $inspection->layout_img)) }}" class="plan-img">
         </div>
     @endif
 
@@ -191,13 +209,13 @@
 
     <!-- ================= 4. INDICATED LAYOUT PLAN ================= -->
     <div class="section-title">Indicated layout plan</div>
-    @if(isset($indicatedPath) && file_exists(public_path('storage/' . $indicatedPath)))
+    @if(isset($indicatedPath) && file_exists($indicatedPath))
         <div class="plan-box">
-            <img src="{{ public_path('storage/' . $indicatedPath) }}" class="plan-img">
+            <img src="{{ getBase64Image($indicatedPath) }}" class="plan-img">
         </div>
     @elseif($inspection->layout_img && file_exists(public_path('storage/' . $inspection->layout_img)))
         <div class="plan-box">
-            <img src="{{ public_path('storage/' . $inspection->layout_img) }}" class="plan-img">
+            <img src="{{ getBase64Image(public_path('storage/' . $inspection->layout_img)) }}" class="plan-img">
         </div>
     @endif
 
@@ -220,23 +238,24 @@
                 <tr>
                     <td class="label-col">LOCATION</td>
                     <td class="val-col">{{ strtoupper($defect->location) }}</td>
-                    <td rowspan="4" class="map-col" style="text-align: center; vertical-align: middle;">
-    <!-- KUNCI KOTAK KEPADA NISBAH 3:4 (Lebar 120px, Tinggi 160px) -->
-    <div style="position: relative; display: inline-block; width: 120px; height: 160px; margin: 0 auto; line-height: 0;">
-        
-        @if(isset($defect->single_map_path) && file_exists(public_path('storage/' . $defect->single_map_path)))
-            <img src="{{ public_path('storage/' . $defect->single_map_path) }}" style="width: 100%; height: 100%; display: block; border: 1px solid #cbd5e0; object-fit: cover;">
-        @elseif($inspection->layout_img && file_exists(public_path('storage/' . $inspection->layout_img)))
-            <img src="{{ public_path('storage/' . $inspection->layout_img) }}" style="width: 100%; height: 100%; display: block; border: 1px solid #cbd5e0; object-fit: cover;">
-        @endif
+                    <td rowspan="4" class="map-col" style="text-align: center; vertical-align: middle; padding: 5px;">
+    
+                        @if(isset($defect->single_map_path) && file_exists($defect->single_map_path))
+                            <!-- 1. Jika gambar dah ada titik kekal -->
+                            <img src="{{ getBase64Image($defect->single_map_path) }}" style="width: 120px; height: auto; display: block; margin: 0 auto; border: 1.5px solid #cbd5e0;">
+                            
+                        @elseif($inspection->layout_img && file_exists(public_path('storage/' . $inspection->layout_img)))
+                            <!-- 2. Fallback: Jika guna pelan kosong asal -->
+                            <div style="position: relative; width: 120px; margin: 0 auto;">
+                                <img src="{{ getBase64Image(public_path('storage/' . $inspection->layout_img)) }}" style="width: 100%; height: auto; display: block; border: 1.5px solid #cbd5e0;">
+                                
+                                @if(isset($defect->mark_x) && isset($defect->mark_y) && $defect->mark_x > 0)
+                                    <div style="position: absolute; left: {{ $defect->mark_x }}%; top: {{ $defect->mark_y }}%; width: 10px; height: 10px; background: #ef4444; border-radius: 50%; margin-left: -5px; margin-top: -5px; border: 1px solid white;"></div>
+                                @endif
+                            </div>
+                        @endif
 
-        <!-- Titik Merah Marker PDF -->
-        @if(isset($defect->mark_x) && isset($defect->mark_y) && $defect->mark_x > 0)
-            <div style="position: absolute; left: {{ $defect->mark_x }}%; top: {{ $defect->mark_y }}%; width: 10px; height: 10px; background: #ef4444; border-radius: 50%; transform: translate(-50%, -50%); border: 1.5px solid white; box-shadow: 0 0 3px rgba(0,0,0,0.6);"></div>
-        @endif
-        
-    </div>
-</td>
+                    </td>
                 </tr>
                 <tr>
                     <td class="label-col">ELEMENT</td>
@@ -254,13 +273,13 @@
                 <tr>
                     <td colspan="3">
                         <div class="evidence-container">
-                            @if($defect->img && is_array($defect->img))
+                            @if(!empty($defect->local_evidence))
                                 <table class="evidence-table">
                                     <tr>
-                                        @foreach(array_slice($defect->img, 0, 4) as $img)
-                                            @if(file_exists(public_path('storage/' . $img)))
+                                        @foreach($defect->local_evidence as $localImg)
+                                            @if(file_exists($localImg))
                                                 <td>
-                                                    <img src="{{ public_path('storage/' . $img) }}" class="evidence-img">
+                                                    <img src="{{ getBase64Image($localImg) }}" class="evidence-img">
                                                 </td>
                                             @endif
                                         @endforeach

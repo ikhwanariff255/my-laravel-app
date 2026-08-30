@@ -8,7 +8,8 @@
     </div>
 
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <form action="{{ route('cashflow.store') }}" method="POST">
+        <!-- TAMBAH ENCTYPE DI SINI -->
+        <form action="{{ route('cashflow.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
             
             <div class="p-8">
@@ -59,7 +60,7 @@
                         </datalist>
                     </div>
 
-                    <!-- Staff Selection (Hidden by default, shown if Cash Out is selected) -->
+                    <!-- Staff Selection -->
                     <div id="staff-selection" style="display: none;">
                         <label class="block text-sm font-medium text-gray-700 mb-2">Related Staff (Optional)</label>
                         <select name="user_id" class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none bg-white">
@@ -68,7 +69,7 @@
                                 <option value="{{ $staff->id }}">{{ $staff->name }}</option>
                             @endforeach
                         </select>
-                        <small class="text-gray-500">Select if this is a wage/allowance payment.</small>
+                        <small class="text-gray-500 block mt-1">Select if this is a wage/allowance payment.</small>
                     </div>
                 </div>
 
@@ -76,6 +77,13 @@
                 <div class="mb-6">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Description / Notes <span class="text-red-500">*</span></label>
                     <textarea name="description" rows="3" class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none" placeholder="Explain the transaction details..." required></textarea>
+                </div>
+
+                <!-- RUANG UPLOAD BUKTI / RESIT -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Upload Evidence / Receipt (Optional)</label>
+                    <input type="file" name="receipt" accept="image/*,.pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-gray-300 rounded-lg outline-none">
+                    <small class="text-gray-400 block mt-1">Format: JPG, PNG, PDF. Max: 2MB.</small>
                 </div>
             </div>
 
@@ -96,7 +104,6 @@
             staffDiv.style.display = 'block';
         } else {
             staffDiv.style.display = 'none';
-            // Reset the select box
             staffDiv.querySelector('select').value = '';
         }
     }

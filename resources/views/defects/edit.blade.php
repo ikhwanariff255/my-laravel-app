@@ -55,8 +55,7 @@
                     </div>
                     <div class="p-6 bg-gray-50 flex flex-col items-center">
                         <div class="layout-container-block w-full max-w-md" id="layout-container">
-                            <img src="{{ asset('storage/' . $inspection->layout_img) }}" id="layout-img" class="w-full object-contain max-h-[500px]">
-                            <div class="marker-point" id="marker" style="left: {{ $defect->mark_x }}%; top: {{ $defect->mark_y }}%; display: block;"></div>
+                        <img src="{{ $inspection->layout_url }}" id="layout-img" style="width: 100%; height: auto; display: block; border-radius: 8px;">                                <div class="marker-point" id="marker" style="left: {{ $defect->mark_x }}%; top: {{ $defect->mark_y }}%; display: block;"></div>
                         </div>
                         <p class="text-gray-500 mt-3 text-sm font-bold">Click on the plan to change the red dot position.</p>
                         <input type="hidden" id="mx" value="{{ $defect->mark_x }}">
@@ -102,11 +101,12 @@
                         <p class="text-xs text-gray-500 mb-2">Gambar sedia ada akan dikekalkan sekiranya anda tidak memuat naik gambar baharu.</p>
                         
                         <!-- Paparan Gambar Sedia Ada -->
-                        <div class="flex gap-3 mb-3 flex-wrap">
-                            @if(is_array($defect->img))
-                                @foreach($defect->img as $img)
+<div class="flex gap-3 mb-3 flex-wrap">
+                            @if(!empty($defect->image_urls))
+                                @foreach($defect->image_urls as $secureUrl)
                                     <div class="relative">
-                                        <img src="{{ asset('storage/' . $img) }}" class="w-20 h-20 object-cover rounded-lg border-2 border-gray-200">
+                                        <!-- Directly use the secure S3 URL -->
+                                        <img src="{{ $secureUrl }}" class="w-20 h-20 object-cover rounded-lg border-2 border-gray-200">
                                         <span class="absolute -top-2 -right-2 bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold shadow-sm">DB</span>
                                     </div>
                                 @endforeach
@@ -159,31 +159,29 @@
 
     // --- 2. LOGIK MARKER MAP ---
     // --- 2. LOGIK MARKER MAP YANG TEPAT ---
-    document.getElementById('layout-img').addEventListener('click', function(e) {
-    const img = this;
-    const rect = img.getBoundingClientRect();
+   document.getElementById('layout-img').addEventListener('click', function(e) {
+    const rect = this.getBoundingClientRect();
     
-    // Kira kedudukan klik tepat di atas permukaan imej
+    // Kira kedudukan klik tepat di atas permukaan render imej
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
     
-    // Tukar kepada peratusan (%) berpandukan lebar dan tinggi imej semasa
-    let xPercent = (clickX / rect.width) * 100;
-    let yPercent = (clickY / rect.height) * 100;
+    // Tukar kepada peratusan (%) berpandukan saiz imej yang terpapar
+    let x = (clickX / rect.width) * 100;
+    let y = (clickY / rect.height) * 100;
     
-    // Hadkan nilai antara 0 hingga 100 sahaja
-    xPercent = Math.max(0, Math.min(100, xPercent));
-    yPercent = Math.max(0, Math.min(100, yPercent));
+    // Hadkan peratusan dalam lingkungan 0-100% sahaja
+    x = Math.max(0, Math.min(100, x));
+    y = Math.max(0, Math.min(100, y));
     
     const marker = document.getElementById('marker');
-    marker.style.left = xPercent + '%'; 
-    marker.style.top = yPercent + '%'; 
+    marker.style.left = x + '%'; 
+    marker.style.top = y + '%'; 
     marker.style.display = 'block';
     
-    document.getElementById('mx').value = xPercent.toFixed(2);
-    document.getElementById('my').value = yPercent.toFixed(2);
+    document.getElementById('mx').value = x.toFixed(2);
+    document.getElementById('my').value = y.toFixed(2);
 });
-
     // Pastikan titik merah sedia ada terpapar jika nilai DB wujud semasa halaman dimuatkan
     document.addEventListener("DOMContentLoaded", function() {
         updateWordCount();

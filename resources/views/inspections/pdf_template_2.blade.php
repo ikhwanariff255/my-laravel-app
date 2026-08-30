@@ -81,7 +81,7 @@
         }
 
         .defect-header {
-            background-color: #ffff00 !important;
+            background-color: #9cb4d4 !important;
             font-weight: bold;
             text-align: center;
             text-transform: uppercase;
@@ -370,7 +370,7 @@
                     <tr class="data-row">
                         <td class="data-location col-location">{{ ucfirst(strtolower($defect->location)) }}</td>
                         <td class="data-element col-element">{{ ucfirst(strtolower($defect->category)) }}</td>
-                        <td class="data-defect col-defect">{{ $defect->defect }}</td>
+                        <td class="data-defect col-defect" style="color: red; font-weight: bold;">{{ $defect->defect }}</td>
                         <td class="data-remarks col-remarks">{!! nl2br(e($defect->desc)) !!}</td>
                     </tr>
 

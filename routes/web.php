@@ -43,11 +43,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/inspections/create', [InspectionController::class, 'create'])->name('inspection.create');
     Route::post('/inspections', [InspectionController::class, 'store'])->name('inspection.store');
     Route::get('/inspections', [InspectionController::class, 'index'])->name('inspection.index');
+
+    Route::resource('inspection', InspectionController::class);
     
     // Route Baru untuk View dan Edit
     Route::get('/inspections/{inspection}', [InspectionController::class, 'show'])->name('inspection.show');
     Route::get('/inspections/{inspection}/edit', [InspectionController::class, 'edit'])->name('inspection.edit');
     Route::put('/inspections/{inspection}', [InspectionController::class, 'update'])->name('inspection.update');
+    
+    // --> TAMBAH BARIS INI SUPAYA BUTTON DELETE INSPECTION BERFUNGSI <--
+    Route::delete('/inspections/{inspection}', [InspectionController::class, 'destroy'])->name('inspection.destroy');
 
     // Route untuk Defect Rapid Entry
     Route::get('/inspections/{inspection}/add-defects', [\App\Http\Controllers\DefectController::class, 'createRapid'])->name('defects.rapid');
@@ -63,7 +68,6 @@ Route::middleware('auth')->group(function () {
     // ==========================================
     // Modul Invoice & Cash Flow
     // ==========================================
-// Modul Invoice & Cash Flow
     Route::get('/invoice', [InvoiceController::class, 'index'])->name('invoice.index');
     Route::get('/invoice/create', [InvoiceController::class, 'create'])->name('invoice.create');
     Route::post('/invoice', [InvoiceController::class, 'store'])->name('invoice.store');
@@ -71,8 +75,6 @@ Route::middleware('auth')->group(function () {
     // Route Download PDF Invoice
     Route::get('/invoice/{id}/pdf', [InvoiceController::class, 'downloadPDF'])->name('invoice.pdf');
 
-    // // Route untuk Cash Flow
-    // Route::get('/cashflow', [CashFlowController::class, 'index'])->name('cashflow.index');
     // ==========================================
     // Modul Cash Flow
     // ==========================================

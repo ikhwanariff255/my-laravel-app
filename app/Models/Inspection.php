@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class Inspection extends Model
 {
@@ -34,5 +35,27 @@ class Inspection extends Model
     public function staffs()
     {
         return $this->belongsToMany(User::class, 'inspection_user', 'inspection_id', 'user_id');
+    }
+
+    protected $appends = ['image_url', 'layout_url'];
+
+    // Generate secure URL for the main image
+    public function getImageUrlAttribute()
+    {
+        if (!$this->img) return null;
+        
+        return Storage::disk('s3')->temporaryUrl(
+            $this->img, now()->addMinutes(60)
+        );
+    }
+
+    // Generate secure URL for the layout image
+    public function getLayoutUrlAttribute()
+    {
+        if (!$this->layout_img) return null;
+        
+        return Storage::disk('s3')->temporaryUrl(
+            $this->layout_img, now()->addMinutes(60)
+        );
     }
 }

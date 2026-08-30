@@ -127,7 +127,7 @@
                     @if($inspection->img)
                         <div class="mb-3">
                             <p class="text-xs text-gray-400 mb-1">Current Image:</p>
-                            <img src="{{ asset('storage/' . $inspection->img) }}" class="w-32 h-24 object-cover rounded-lg border">
+                            <img src="{{ $inspection->image_url }}" class="w-32 h-24 object-cover rounded-lg border">
                         </div>
                     @endif
                     <input type="file" id="imageInput" accept="image/*" class="w-full px-3 py-2 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700">
@@ -148,7 +148,7 @@
                     @if($inspection->layout_img)
                         <div class="mb-3">
                             <p class="text-xs text-gray-400 mb-1">Current Plan:</p>
-                            <img src="{{ asset('storage/' . $inspection->layout_img) }}" class="w-24 h-32 object-cover rounded-lg border">
+                            <img src="{{ $inspection->layout_url }}" class="w-24 h-32 object-cover rounded-lg border">
                         </div>
                     @endif
                     <input type="file" id="layoutInput" accept="image/*" class="w-full px-3 py-2 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700">

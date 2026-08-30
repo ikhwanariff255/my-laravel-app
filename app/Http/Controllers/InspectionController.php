@@ -8,31 +8,30 @@ use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class InspectionController extends Controller
 {
-    // Paparkan borang pendaftaran inspection
-
     public function staffs()
     {
         return $this->belongsToMany(User::class, 'inspection_user', 'inspection_id', 'user_id');
     }
+
     public function create()
     {
         $staffs = User::all();
+
         return view('inspections.create', compact('staffs'));
     }
 
-    // Simpan data dari borang ke dalam database
-    // Simpan data dari borang ke dalam database
     public function store(Request $request)
     {
         $request->validate([
             'title' => 'required|string|max:255',
             'clientname' => 'required|string|max:255',
-            'user_id' => 'required|array', // Pastikan ia array
+            'user_id' => 'required|array',
             'user_id.*' => 'exists:users,id',
             'address' => 'required|string',
             'state' => 'required|string',
@@ -40,8 +39,6 @@ class InspectionController extends Controller
             'cropped_image' => 'nullable|string',
             'cropped_layout' => 'nullable|string',
         ]);
-
-        Storage::disk('public')->makeDirectory('inspections');
 
         $imgPath = null;
         $layoutPath = null;
@@ -53,9 +50,10 @@ class InspectionController extends Controller
             }
             $imageDecoded = base64_decode($base64Image);
             if ($imageDecoded !== false) {
-                $filename = 'home_' . time() . '_' . Str::random(5) . '.jpg';
-                Storage::disk('public')->put('inspections/' . $filename, $imageDecoded);
-                $imgPath = 'inspections/' . $filename;
+                $filename = 'home_'.time().'_'.Str::random(5).'.jpg';
+                // Save directly to S3
+                Storage::disk('s3')->put('inspections/'.$filename, $imageDecoded);
+                $imgPath = 'inspections/'.$filename;
             }
         }
 
@@ -66,15 +64,15 @@ class InspectionController extends Controller
             }
             $layoutDecoded = base64_decode($base64Layout);
             if ($layoutDecoded !== false) {
-                $filename = 'layout_' . time() . '_' . Str::random(5) . '.jpg';
-                Storage::disk('public')->put('inspections/' . $filename, $layoutDecoded);
-                $layoutPath = 'inspections/' . $filename;
+                $filename = 'layout_'.time().'_'.Str::random(5).'.jpg';
+                // Save directly to S3
+                Storage::disk('s3')->put('inspections/'.$filename, $layoutDecoded);
+                $layoutPath = 'inspections/'.$filename;
             }
         }
 
-        // Cipta inspection
         $inspection = Inspection::create([
-            'user_id'    => Auth::id(),
+            'user_id' => Auth::id(),
             'title' => $request->title,
             'clientname' => $request->clientname,
             'address' => $request->address,
@@ -87,29 +85,25 @@ class InspectionController extends Controller
             'inspection_date' => $request->inspection_date,
         ]);
 
-        // Simpan multiple staf ke pivot table
         $inspection->staffs()->attach($request->user_id);
 
         return redirect()->route('inspection.index')->with('success', 'Projek pemeriksaan berjaya didaftarkan!');
     }
 
-    // Paparkan butiran terperinci projek inspection
     public function show(Inspection $inspection)
     {
-        // Load defects dengan pagination (5 rekod setiap halaman)
         $defects = $inspection->defects()->paginate(5);
 
         return view('inspections.show', compact('inspection', 'defects'));
     }
 
-    // Paparkan borang edit projek
     public function edit(Inspection $inspection)
     {
         $staffs = User::all();
+
         return view('inspections.edit', compact('inspection', 'staffs'));
     }
 
-    // Simpan kemaskini data projek
     public function update(Request $request, Inspection $inspection)
     {
         $request->validate([
@@ -137,12 +131,13 @@ class InspectionController extends Controller
             }
             $imageDecoded = base64_decode($base64Image);
             if ($imageDecoded !== false) {
-                if ($inspection->img && Storage::disk('public')->exists($inspection->img)) {
-                    Storage::disk('public')->delete($inspection->img);
+                // Delete old from S3
+                if ($inspection->img && Storage::disk('s3')->exists($inspection->img)) {
+                    Storage::disk('s3')->delete($inspection->img);
                 }
-                $filename = 'home_' . time() . '_' . Str::random(5) . '.jpg';
-                Storage::disk('public')->put('inspections/' . $filename, $imageDecoded);
-                $imgPath = 'inspections/' . $filename;
+                $filename = 'home_'.time().'_'.Str::random(5).'.jpg';
+                Storage::disk('s3')->put('inspections/'.$filename, $imageDecoded);
+                $imgPath = 'inspections/'.$filename;
             }
         }
 
@@ -153,16 +148,16 @@ class InspectionController extends Controller
             }
             $layoutDecoded = base64_decode($base64Layout);
             if ($layoutDecoded !== false) {
-                if ($inspection->layout_img && Storage::disk('public')->exists($inspection->layout_img)) {
-                    Storage::disk('public')->delete($inspection->layout_img);
+                // Delete old from S3
+                if ($inspection->layout_img && Storage::disk('s3')->exists($inspection->layout_img)) {
+                    Storage::disk('s3')->delete($inspection->layout_img);
                 }
-                $filename = 'layout_' . time() . '_' . Str::random(5) . '.jpg';
-                Storage::disk('public')->put('inspections/' . $filename, $layoutDecoded);
-                $layoutPath = 'inspections/' . $filename;
+                $filename = 'layout_'.time().'_'.Str::random(5).'.jpg';
+                Storage::disk('s3')->put('inspections/'.$filename, $layoutDecoded);
+                $layoutPath = 'inspections/'.$filename;
             }
         }
 
-        // Kemaskini data termasuk medan baru
         $inspection->update([
             'title' => $request->title,
             'clientname' => $request->clientname,
@@ -176,25 +171,33 @@ class InspectionController extends Controller
             'layout_img' => $layoutPath,
         ]);
 
-        // Kemaskini senarai staf (sync menggantikan yang lama dengan pilihan baru)
         $inspection->staffs()->sync($request->user_id);
 
         return redirect()->route('inspection.index')->with('success', 'Maklumat projek berjaya dikemaskini!');
     }
 
-    // Fungsi untuk memuat turun PDF laporan
     public function downloadPDF($id, $template_type)
     {
+        // 1. Start the timer
+        $startTime = microtime(true);
+
+        ini_set('memory_limit', '512M');
+        ini_set('max_execution_time', 300);
+
         $inspection = Inspection::with('defects', 'user')->findOrFail($id);
         $settings = CompanySetting::first();
 
         $indicatedPath = null;
-        $sourcePath = $inspection->layout_img ? storage_path('app/public/' . $inspection->layout_img) : null;
-
         $locationMaps = [];
+        $imgData = null;
 
-        if ($sourcePath && file_exists($sourcePath)) {
-            $imgData = @file_get_contents($sourcePath);
+        if ($inspection->layout_img && Storage::disk('s3')->exists($inspection->layout_img)) {
+            $imgData = Storage::disk('s3')->get($inspection->layout_img);
+        }
+
+        Storage::disk('public')->makeDirectory('inspections');
+
+        if ($imgData) {
             $img = @imagecreatefromstring($imgData);
 
             if ($img) {
@@ -204,7 +207,6 @@ class InspectionController extends Controller
                 $white = imagecolorallocate($img, 255, 255, 255);
                 $markerSize = max(15, round($width / 50));
 
-                // 1. Jana Indicated Layout (Pelan Utama Bertitik Penuh)
                 foreach ($inspection->defects as $defect) {
                     if ($defect->mark_x > 0 || $defect->mark_y > 0) {
                         $px = ($defect->mark_x / 100) * $width;
@@ -214,19 +216,17 @@ class InspectionController extends Controller
                     }
                 }
 
-                $indicatedFilename = 'indicated_' . $id . '_' . time() . '.jpg';
-                $indicatedFullPath = storage_path('app/public/inspections/' . $indicatedFilename);
-                imagejpeg($img, $indicatedFullPath, 90);
-                $indicatedPath = 'inspections/' . $indicatedFilename;
+                $indicatedFilename = 'indicated_'.$id.'_'.time().'.jpg';
+                $indicatedPath = storage_path('app/public/inspections/'.$indicatedFilename);
+                imagejpeg($img, $indicatedPath, 90);
                 imagedestroy($img);
 
-                // 1B. Jana Location-Specific Indication Maps (Hanya Defect Lokasi Tersebut)
-                $groupedDefects = $inspection->defects->groupBy(function($item) {
-                    return !empty($item->location) ? strtoupper(trim($item->location)) : 'UNSPECIFIED LOCATION';
+                $groupedDefects = $inspection->defects->groupBy(function ($item) {
+                    return ! empty($item->location) ? strtoupper(trim($item->location)) : 'UNSPECIFIED LOCATION';
                 });
 
                 foreach ($groupedDefects as $location => $defects) {
-                    $locImg = @imagecreatefromstring(@file_get_contents($sourcePath));
+                    $locImg = @imagecreatefromstring($imgData);
                     if ($locImg) {
                         $lW = imagesx($locImg);
                         $lH = imagesy($locImg);
@@ -243,77 +243,121 @@ class InspectionController extends Controller
                             }
                         }
 
-                        $locFilename = 'indicated_loc_' . md5($location) . '_' . $id . '_' . time() . '.jpg';
-                        $locFullPath = storage_path('app/public/inspections/' . $locFilename);
+                        $locFilename = 'indicated_loc_'.md5($location).'_'.$id.'_'.time().'.jpg';
+                        $locFullPath = storage_path('app/public/inspections/'.$locFilename);
                         imagejpeg($locImg, $locFullPath, 90);
-                        $locationMaps[$location] = 'inspections/' . $locFilename;
+                        $locationMaps[$location] = $locFullPath;
                         imagedestroy($locImg);
                     }
                 }
             }
 
-            // 2. Jana Peta Mini Individu (Single Marker Map) untuk setiap Defect
             foreach ($inspection->defects as $defect) {
                 if ($defect->mark_x > 0 || $defect->mark_y > 0) {
-                    $singleImg = @imagecreatefromstring(@file_get_contents($sourcePath));
+                    $singleImg = @imagecreatefromstring($imgData);
                     if ($singleImg) {
                         $sW = imagesx($singleImg);
                         $sH = imagesy($singleImg);
                         $sRed = imagecolorallocate($singleImg, 255, 0, 0);
                         $sWhite = imagecolorallocate($singleImg, 255, 255, 255);
-                        $sSize = max(25, round($sW / 30)); // Saiz titik lebih besar sikit untuk peta mini
+                        $sSize = max(25, round($sW / 30));
 
                         $sPx = ($defect->mark_x / 100) * $sW;
                         $sPy = ($defect->mark_y / 100) * $sH;
                         imagefilledellipse($singleImg, $sPx, $sPy, $sSize, $sSize, $sRed);
                         imageellipse($singleImg, $sPx, $sPy, $sSize, $sSize, $sWhite);
 
-                        $mapFilename = 'map_defect_' . $defect->id . '.jpg';
-                        $mapFullPath = storage_path('app/public/inspections/' . $mapFilename);
+                        $mapFilename = 'map_defect_'.$defect->id.'.jpg';
+                        $mapFullPath = storage_path('app/public/inspections/'.$mapFilename);
                         imagejpeg($singleImg, $mapFullPath, 90);
                         imagedestroy($singleImg);
 
-                        // Simpan temporary path pada objek defect
-                        $defect->single_map_path = 'inspections/' . $mapFilename;
+                        $defect->single_map_path = $mapFullPath;
                     }
                 }
             }
         }
 
+        $tempEvidenceFiles = [];
+        $tempCoverImage = null;
+
+        // Pre-download Cover Image
+        if ($inspection->img && Storage::disk('s3')->exists($inspection->img)) {
+            $coverData = Storage::disk('s3')->get($inspection->img);
+            $tempCoverImage = storage_path('app/public/inspections/cover_'.time().'.jpg');
+            file_put_contents($tempCoverImage, $coverData);
+
+            $inspection->local_cover = $tempCoverImage;
+        }
+
+        // Pre-download Defect Evidence Images
+        foreach ($inspection->defects as $defect) {
+            $localEvidencePaths = [];
+
+            if (! empty($defect->img) && is_array($defect->img)) {
+                foreach (array_slice($defect->img, 0, 4) as $s3Path) {
+                    if (Storage::disk('s3')->exists($s3Path)) {
+                        $imgContent = Storage::disk('s3')->get($s3Path);
+                        $tempFilename = storage_path('app/public/inspections/ev_'.uniqid().'.jpg');
+                        file_put_contents($tempFilename, $imgContent);
+
+                        $localEvidencePaths[] = $tempFilename;
+                        $tempEvidenceFiles[] = $tempFilename;
+                    }
+                }
+            }
+            $defect->local_evidence = $localEvidencePaths;
+        }
+
+        $pdf = Pdf::setOptions(['isRemoteEnabled' => true]);
+
         if ($template_type == 'template1') {
-            $pdf = Pdf::loadView('inspections.pdf_template_1', compact('inspection', 'settings', 'indicatedPath'));
+            $pdf->loadView('inspections.pdf_template_1', compact('inspection', 'settings', 'indicatedPath'));
         } else {
-            $pdf = Pdf::loadView('inspections.pdf_template_2', compact('inspection', 'settings', 'indicatedPath', 'locationMaps'));
+            $pdf->loadView('inspections.pdf_template_2', compact('inspection', 'settings', 'indicatedPath', 'locationMaps'));
         }
 
         $pdf->setPaper('A4', 'portrait');
-        $response = $pdf->download('Laporan_Defect_' . str_replace(' ', '_', $inspection->title) . '.pdf');
+        $safeTitle = str_replace([' ', '/', '\\'], '_', $inspection->title);
+        $response = $pdf->download('Laporan_Defect_'.$safeTitle.'.pdf');
 
-        // Cleanup fail sementara
-        if ($indicatedPath && file_exists(storage_path('app/public/' . $indicatedPath))) {
-            @unlink(storage_path('app/public/' . $indicatedPath));
+        // Cleanup Absolute Paths
+        if ($indicatedPath && file_exists($indicatedPath)) {
+            @unlink($indicatedPath);
         }
         foreach ($locationMaps as $locMap) {
-            if (file_exists(storage_path('app/public/' . $locMap))) {
-                @unlink(storage_path('app/public/' . $locMap));
+            if (file_exists($locMap)) {
+                @unlink($locMap);
             }
         }
         foreach ($inspection->defects as $defect) {
-            if (isset($defect->single_map_path) && file_exists(storage_path('app/public/' . $defect->single_map_path))) {
-                @unlink(storage_path('app/public/' . $defect->single_map_path));
+            if (isset($defect->single_map_path) && file_exists($defect->single_map_path)) {
+                @unlink($defect->single_map_path);
             }
         }
+
+        if ($tempCoverImage && file_exists($tempCoverImage)) {
+            @unlink($tempCoverImage);
+        }
+        foreach ($tempEvidenceFiles as $tempFile) {
+            if (file_exists($tempFile)) {
+                @unlink($tempFile);
+            }
+        }
+
+        // 2. Stop the timer, calculate duration, and log it
+        $endTime = microtime(true);
+        $executionTime = round($endTime - $startTime, 2);
+
+        Log::info("PDF Generation Time (Inspection ID: {$id}): {$executionTime} seconds.");
 
         return $response;
     }
 
-    // Paparkan senarai semua projek inspection
     public function index(Request $request)
     {
-        // 1. Mula bina query asas
         $query = Inspection::with('user')->latest();
 
-        // 2. Logik Carian (Search bar) - Cari nama projek, klien, atau alamat
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -323,14 +367,29 @@ class InspectionController extends Controller
             });
         }
 
-        // 3. Logik Tapisan (Filter Dropdown) - Tapis mengikut jenis hartanah
         if ($request->filled('type')) {
             $query->where('type', $request->type);
         }
 
-        // 4. Paginate 10 rekod dan KEKALKAN parameter carian pada URL (supaya bila tekan page 2, carian tak hilang)
         $inspections = $query->paginate(10)->appends($request->all());
 
         return view('inspections.index', compact('inspections'));
+    }
+
+    public function destroy(Inspection $inspection)
+    {
+        // Delete from S3
+        if ($inspection->img && Storage::disk('s3')->exists($inspection->img)) {
+            Storage::disk('s3')->delete($inspection->img);
+        }
+
+        if ($inspection->layout_img && Storage::disk('s3')->exists($inspection->layout_img)) {
+            Storage::disk('s3')->delete($inspection->layout_img);
+        }
+
+        $inspection->staffs()->detach();
+        $inspection->delete();
+
+        return redirect()->route('inspection.index')->with('success', 'Projek pemeriksaan berjaya dipadam!');
     }
 }

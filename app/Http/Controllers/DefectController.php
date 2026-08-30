@@ -6,7 +6,7 @@ use App\Models\Defect;
 use App\Models\Inspection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage; // Pastikan letak ni kat atas sekali kalau belum ada
+use Illuminate\Support\Facades\Storage; 
 
 class DefectController extends Controller
 {
@@ -15,14 +15,14 @@ class DefectController extends Controller
         return view('defects.add_items', compact('inspection'));
     }
 
-
     public function storeRapid(Request $request, Inspection $inspection)
     {
         $imagePaths = [];
 
         if ($request->hasFile('images')) {
             foreach ($request->file('images') as $file) {
-                $imagePaths[] = $file->store('defects', 'public');
+                // Changed 'public' to 's3'
+                $imagePaths[] = $file->store('defects', 's3');
             }
         }
 
@@ -46,7 +46,6 @@ class DefectController extends Controller
         ]);
     }
 
-
     // Paparkan UI Edit
     public function edit(Defect $defect)
     {
@@ -67,19 +66,21 @@ class DefectController extends Controller
 
         // Kalau ada gambar baru di-upload, kita gantikan yang lama
         if ($request->hasFile('images')) {
-            // Padam gambar lama dari server
+            // Padam gambar lama dari AWS S3
             if (is_array($defect->img)) {
                 foreach ($defect->img as $oldImage) {
-                    if (Storage::disk('public')->exists($oldImage)) {
-                        Storage::disk('public')->delete($oldImage);
+                    // Changed 'public' to 's3'
+                    if (Storage::disk('s3')->exists($oldImage)) {
+                        Storage::disk('s3')->delete($oldImage);
                     }
                 }
             }
 
-            // Masukkan gambar baru
+            // Masukkan gambar baru ke S3
             $imagePaths = [];
             foreach ($request->file('images') as $file) {
-                $imagePaths[] = $file->store('defects', 'public');
+                // Changed 'public' to 's3'
+                $imagePaths[] = $file->store('defects', 's3');
             }
             $defect->img = $imagePaths;
         }
@@ -92,11 +93,12 @@ class DefectController extends Controller
     // Proses Delete Data
     public function destroy(Defect $defect)
     {
-        // Padam gambar dari server sebelum delete rekod
+        // Padam gambar dari AWS S3 sebelum delete rekod
         if (is_array($defect->img)) {
             foreach ($defect->img as $image) {
-                if (Storage::disk('public')->exists($image)) {
-                    Storage::disk('public')->delete($image);
+                // Changed 'public' to 's3'
+                if (Storage::disk('s3')->exists($image)) {
+                    Storage::disk('s3')->delete($image);
                 }
             }
         }

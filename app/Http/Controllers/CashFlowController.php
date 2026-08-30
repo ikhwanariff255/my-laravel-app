@@ -42,6 +42,7 @@ class CashFlowController extends Controller
     }
 
     // 3. Simpan Transaksi Manual
+    // 3. Simpan Transaksi Manual
     public function store(Request $request)
     {
         $request->validate([
@@ -51,6 +52,7 @@ class CashFlowController extends Controller
             'description' => 'required|string',
             'date' => 'required|date',
             'user_id' => 'nullable|exists:users,id',
+            'receipt' => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:2048', // Validasi fail resit
         ]);
 
         // Auto Generate Nombor Rujukan Manual (REC = Receipt/In, VOU = Voucher/Out)
@@ -67,6 +69,13 @@ class CashFlowController extends Controller
         }
         $refNo = "{$prefix}-{$today}-" . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
 
+        // Proses muat naik resit (Jika ada)
+        $receiptPath = null;
+        if ($request->hasFile('receipt')) {
+            // Simpan fail ke dalam folder storage/app/public/cashflows/receipts
+            $receiptPath = $request->file('receipt')->store('cashflows/receipts', 'public');
+        }
+
         // Simpan ke database
         CashFlow::create([
             'type' => $request->type,
@@ -75,7 +84,8 @@ class CashFlowController extends Controller
             'description' => $request->description,
             'date' => $request->date,
             'reference_no' => $refNo,
-            'user_id' => $request->user_id, // Boleh null kalau bukan untuk staf
+            'user_id' => $request->user_id,
+            'receipt' => $receiptPath, // Simpan path resit
         ]);
 
         return redirect()->route('cashflow.index')->with('success', 'Transaksi aliran tunai manual berjaya direkodkan!');

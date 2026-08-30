@@ -95,7 +95,7 @@
                     </div>
                     <div class="p-6 bg-gray-50 flex flex-col items-center">
                         <div class="layout-container-block w-full max-w-md" id="layout-container-{INDEX}">
-                            <img src="{{ asset('storage/' . $inspection->layout_img) }}" id="layout-img-{INDEX}" class="w-full object-contain max-h-[500px]">
+                            <img src="{{ $inspection->layout_url }}" id="layout-img-{INDEX}" class="w-full object-contain max-h-[500px]">
                             <div class="marker-point" id="marker-{INDEX}"></div>
                         </div>
                         <p class="text-red-500 mt-3 text-sm font-bold" id="marker-warning-{INDEX}">Click on the plan to place the red dot.</p>

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class Defect extends Model
 {
@@ -27,9 +28,23 @@ class Defect extends Model
     {
         return $this->belongsTo(User::class);
     }
-    // Tambah kod ini di dalam class Inspection
-    public function defects()
+
+    protected $appends = ['image_urls'];
+
+    public function getImageUrlsAttribute()
     {
-        return $this->hasMany(Defect::class);
+        if (empty($this->img)) return [];
+
+        // Decode the JSON string into a PHP array (if it isn't cast to an array already)
+        $paths = is_array($this->img) ? $this->img : json_decode($this->img, true);
+
+        if (!is_array($paths)) return [];
+
+        // Generate a presigned URL for every image in the array
+        return array_map(function ($path) {
+            return Storage::disk('s3')->temporaryUrl(
+                $path, now()->addMinutes(60)
+            );
+        }, $paths);
     }
 }
