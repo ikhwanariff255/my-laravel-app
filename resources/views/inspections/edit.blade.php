@@ -65,6 +65,19 @@
                     </select>
                 </div>
 
+                <div class="mb-4">
+    <label for="template_id" class="block text-sm font-medium text-gray-700">Pilih Templat Laporan PDF</label>
+    <select name="template_id" id="template_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+        <option value="">-- Sila Pilih Templat --</option>
+        @foreach(\App\Models\Template::all() as $template)
+            <option value="{{ $template->id }}">{{ $template->name }}</option>
+        @endforeach
+    </select>
+    @error('template_id')
+        <span class="text-red-500 text-sm">{{ $message }}</span>
+    @enderror
+</div>
+
                 <!-- Assigned Staff (Multiple Selection) -->
                 <div class="col-span-1 md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Assigned Staff In Charge (Select one or more)</label>

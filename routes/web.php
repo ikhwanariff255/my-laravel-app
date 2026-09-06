@@ -25,7 +25,7 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-// Dashboard Utama Projek Anda (Ganti view asal Breeze dengan Controller anda)
+// Dashboard Utama Projek Anda
 Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
@@ -34,6 +34,7 @@ Route::get('/dashboard', [DashboardController::class, 'index'])
 Route::middleware('auth')->group(function () {
 
     Route::resource('users', UserController::class);
+    
     // Modul Profile (Bawaan Breeze)
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -46,12 +47,12 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('inspection', InspectionController::class);
     
-    // Route Baru untuk View dan Edit
+    // Route untuk View dan Edit
     Route::get('/inspections/{inspection}', [InspectionController::class, 'show'])->name('inspection.show');
     Route::get('/inspections/{inspection}/edit', [InspectionController::class, 'edit'])->name('inspection.edit');
     Route::put('/inspections/{inspection}', [InspectionController::class, 'update'])->name('inspection.update');
     
-    // --> TAMBAH BARIS INI SUPAYA BUTTON DELETE INSPECTION BERFUNGSI <--
+    // Route untuk Delete Inspection
     Route::delete('/inspections/{inspection}', [InspectionController::class, 'destroy'])->name('inspection.destroy');
 
     // Route untuk Defect Rapid Entry
@@ -63,14 +64,15 @@ Route::middleware('auth')->group(function () {
     Route::post('/defects/{defect}/update', [\App\Http\Controllers\DefectController::class, 'update'])->name('defects.update');
     Route::delete('/defects/{defect}', [\App\Http\Controllers\DefectController::class, 'destroy'])->name('defects.destroy');
     
-    Route::get('/inspection/{id}/download-pdf/{template_type}', [\App\Http\Controllers\InspectionController::class, 'downloadPDF'])->name('inspection.pdf');
+    // Route Download PDF Inspection (Dibuang template_type kerana sudah dinamik ikut database)
+    Route::get('/inspection/{id}/download-pdf', [InspectionController::class, 'downloadPDF'])->name('inspection.pdf');
 
     // ==========================================
     // Modul Invoice & Cash Flow
     // ==========================================
-    Route::get('/invoice', [InvoiceController::class, 'index'])->name('invoice.index');
-    Route::get('/invoice/create', [InvoiceController::class, 'create'])->name('invoice.create');
-    Route::post('/invoice', [InvoiceController::class, 'store'])->name('invoice.store');
+Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
+    Route::get('/invoices/create', [InvoiceController::class, 'create'])->name('invoices.create');
+    Route::post('/invoices', [InvoiceController::class, 'store'])->name('invoices.store');
     
     // Route Download PDF Invoice
     Route::get('/invoice/{id}/pdf', [InvoiceController::class, 'downloadPDF'])->name('invoice.pdf');
@@ -82,9 +84,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/cashflow/create', [CashFlowController::class, 'create'])->name('cashflow.create');
     Route::post('/cashflow', [CashFlowController::class, 'store'])->name('cashflow.store');
     Route::get('/cashflow/{id}/pdf', [CashFlowController::class, 'downloadPDF'])->name('cashflow.pdf');
-    // Route untuk Laporan Cash Flow Bulanan (Format T-Account PDF)
     Route::get('/cashflow/report-pdf', [CashFlowController::class, 'monthlyReportPDF'])->name('cashflow.report_pdf');
-
 
     Route::get('/reports/part-time', [ReportController::class, 'partTimeWages'])->name('reports.part_time');
 });

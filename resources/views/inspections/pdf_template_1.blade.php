@@ -276,13 +276,15 @@
                             @if(!empty($defect->local_evidence))
                                 <table class="evidence-table">
                                     <tr>
-                                        @foreach($defect->local_evidence as $localImg)
-                                            @if(file_exists($localImg))
-                                                <td>
-                                                    <img src="{{ getBase64Image($localImg) }}" class="evidence-img">
-                                                </td>
-                                            @endif
-                                        @endforeach
+                                        @if(!empty($defect->local_evidence))
+    <div style="display: flex; gap: 5px; margin-top: 5px;">
+        @foreach($defect->local_evidence as $localPath)
+            <img src="{{ $localPath }}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px;">
+        @endforeach
+    </div>
+@else
+    <span style="color: #9ca3af; font-size: 10px;">No evidence images</span>
+@endif
                                     </tr>
                                 </table>
                             @else

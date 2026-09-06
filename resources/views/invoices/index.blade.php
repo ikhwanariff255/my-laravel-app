@@ -8,7 +8,7 @@
             <h2 class="text-2xl font-bold text-gray-800">All Generated Invoices</h2>
             <p class="text-gray-500 text-sm mt-1">Manage and print your official invoices here.</p>
         </div>
-        <a href="{{ route('invoice.create') }}" class="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 shadow-sm transition">
+        <a href="{{ route('invoices.create') }}" class="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 shadow-sm transition">
             <i class="fas fa-plus mr-2"></i> New Invoice
         </a>
     </div>

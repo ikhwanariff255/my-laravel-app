@@ -14,7 +14,7 @@
             <h3 class="font-semibold"><i class="fas fa-file-invoice mr-2"></i> Invoice Details</h3>
         </div>
         
-        <form action="{{ route('invoice.store') }}" method="POST">
+        <form action="{{ route('invoices.store') }}" method="POST">
             @csrf
             <div class="p-6">
                 <!-- Customer Info -->

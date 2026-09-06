@@ -36,9 +36,32 @@ class InspectionController extends Controller
             'address' => 'required|string',
             'state' => 'required|string',
             'type' => 'required|string',
+            'template_id' => 'nullable|exists:templates,id',
             'cropped_image' => 'nullable|string',
             'cropped_layout' => 'nullable|string',
         ]);
+
+        $user = Auth::user();
+
+        if (!$user->company_id) {
+            return back()->with('error', 'Akaun anda tidak diikat pada sebarang syarikat.');
+        }
+
+        $reportLimit = 50; 
+
+        $currentMonthCount = Inspection::where('company_id', $user->company_id)
+            ->whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
+            ->count();
+
+        if ($currentMonthCount >= $reportLimit) {
+            $company = \App\Models\Company::find($user->company_id);
+            if ($company && $company->tokens_left > 0) {
+                $company->decrement('tokens_left');
+            } else {
+                return back()->with('error', 'Had laporan bulanan telah habis. Sila tambah token (RM14/report) atau naik taraf pakej.');
+            }
+        }
 
         $imgPath = null;
         $layoutPath = null;
@@ -51,7 +74,6 @@ class InspectionController extends Controller
             $imageDecoded = base64_decode($base64Image);
             if ($imageDecoded !== false) {
                 $filename = 'home_'.time().'_'.Str::random(5).'.jpg';
-                // Save directly to S3
                 Storage::disk('s3')->put('inspections/'.$filename, $imageDecoded);
                 $imgPath = 'inspections/'.$filename;
             }
@@ -65,23 +87,24 @@ class InspectionController extends Controller
             $layoutDecoded = base64_decode($base64Layout);
             if ($layoutDecoded !== false) {
                 $filename = 'layout_'.time().'_'.Str::random(5).'.jpg';
-                // Save directly to S3
                 Storage::disk('s3')->put('inspections/'.$filename, $layoutDecoded);
                 $layoutPath = 'inspections/'.$filename;
             }
         }
 
         $inspection = Inspection::create([
-            'user_id' => Auth::id(),
-            'title' => $request->title,
-            'clientname' => $request->clientname,
-            'address' => $request->address,
-            'state' => $request->state,
-            'type' => $request->type,
-            'img' => $imgPath,
-            'layout_img' => $layoutPath,
-            'cus_no' => $request->cus_no,
-            'cus_email' => $request->cus_email,
+            'company_id'      => $user->company_id,
+            'user_id'         => $user->id,
+            'template_id'     => $request->template_id,
+            'title'           => $request->title,
+            'clientname'      => $request->clientname,
+            'address'         => $request->address,
+            'state'           => $request->state,
+            'type'            => $request->type,
+            'img'             => $imgPath,
+            'layout_img'      => $layoutPath,
+            'cus_no'          => $request->cus_no,
+            'cus_email'       => $request->cus_email,
             'inspection_date' => $request->inspection_date,
         ]);
 
@@ -117,6 +140,7 @@ class InspectionController extends Controller
             'address' => 'required|string',
             'state' => 'required|string',
             'type' => 'required|string',
+            'template_id' => 'nullable|exists:templates,id',
             'cropped_image' => 'nullable|string',
             'cropped_layout' => 'nullable|string',
         ]);
@@ -131,7 +155,6 @@ class InspectionController extends Controller
             }
             $imageDecoded = base64_decode($base64Image);
             if ($imageDecoded !== false) {
-                // Delete old from S3
                 if ($inspection->img && Storage::disk('s3')->exists($inspection->img)) {
                     Storage::disk('s3')->delete($inspection->img);
                 }
@@ -148,7 +171,6 @@ class InspectionController extends Controller
             }
             $layoutDecoded = base64_decode($base64Layout);
             if ($layoutDecoded !== false) {
-                // Delete old from S3
                 if ($inspection->layout_img && Storage::disk('s3')->exists($inspection->layout_img)) {
                     Storage::disk('s3')->delete($inspection->layout_img);
                 }
@@ -167,6 +189,7 @@ class InspectionController extends Controller
             'address' => $request->address,
             'state' => $request->state,
             'type' => $request->type,
+            'template_id' => $request->template_id,
             'img' => $imgPath,
             'layout_img' => $layoutPath,
         ]);
@@ -176,15 +199,16 @@ class InspectionController extends Controller
         return redirect()->route('inspection.index')->with('success', 'Maklumat projek berjaya dikemaskini!');
     }
 
-    public function downloadPDF($id, $template_type)
+    public function downloadPDF($id)
     {
-        // 1. Start the timer
+        // Elakkan Timeout dan Tambah Memori Sepenuhnya untuk Report Panjang
+        set_time_limit(0);
+        ini_set('memory_limit', '1024M');
+        ini_set('max_execution_time', 600);
+
         $startTime = microtime(true);
 
-        ini_set('memory_limit', '512M');
-        ini_set('max_execution_time', 300);
-
-        $inspection = Inspection::with('defects', 'user')->findOrFail($id);
+        $inspection = Inspection::with('defects', 'user', 'template')->findOrFail($id);
         $settings = CompanySetting::first();
 
         $indicatedPath = null;
@@ -281,7 +305,6 @@ class InspectionController extends Controller
         $tempEvidenceFiles = [];
         $tempCoverImage = null;
 
-        // Pre-download Cover Image
         if ($inspection->img && Storage::disk('s3')->exists($inspection->img)) {
             $coverData = Storage::disk('s3')->get($inspection->img);
             $tempCoverImage = storage_path('app/public/inspections/cover_'.time().'.jpg');
@@ -290,7 +313,6 @@ class InspectionController extends Controller
             $inspection->local_cover = $tempCoverImage;
         }
 
-        // Pre-download Defect Evidence Images
         foreach ($inspection->defects as $defect) {
             $localEvidencePaths = [];
 
@@ -309,19 +331,21 @@ class InspectionController extends Controller
             $defect->local_evidence = $localEvidencePaths;
         }
 
+        $template = $inspection->template; 
+        $viewFile = $template ? $template->view_file : 'pdf_template_1'; 
+
         $pdf = Pdf::setOptions(['isRemoteEnabled' => true]);
 
-        if ($template_type == 'template1') {
-            $pdf->loadView('inspections.pdf_template_1', compact('inspection', 'settings', 'indicatedPath'));
-        } else {
+        if ($viewFile === 'pdf_template_2') {
             $pdf->loadView('inspections.pdf_template_2', compact('inspection', 'settings', 'indicatedPath', 'locationMaps'));
+        } else {
+            $pdf->loadView('inspections.pdf_template_1', compact('inspection', 'settings', 'indicatedPath'));
         }
 
         $pdf->setPaper('A4', 'portrait');
         $safeTitle = str_replace([' ', '/', '\\'], '_', $inspection->title);
         $response = $pdf->download('Laporan_Defect_'.$safeTitle.'.pdf');
 
-        // Cleanup Absolute Paths
         if ($indicatedPath && file_exists($indicatedPath)) {
             @unlink($indicatedPath);
         }
@@ -345,7 +369,6 @@ class InspectionController extends Controller
             }
         }
 
-        // 2. Stop the timer, calculate duration, and log it
         $endTime = microtime(true);
         $executionTime = round($endTime - $startTime, 2);
 
@@ -378,7 +401,6 @@ class InspectionController extends Controller
 
     public function destroy(Inspection $inspection)
     {
-        // Delete from S3
         if ($inspection->img && Storage::disk('s3')->exists($inspection->img)) {
             Storage::disk('s3')->delete($inspection->img);
         }

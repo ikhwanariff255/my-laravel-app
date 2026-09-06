@@ -61,7 +61,8 @@
                     <p class="px-4 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Financials</p>
                     
                     <!-- Link Invoices -->
-                    <a href="{{ route('invoice.index') }}" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg {{ request()->routeIs('invoice.*') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }} transition-colors">
+                    <!-- Link Invoices -->
+                    <a href="{{ route('invoices.index') }}" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg {{ request()->routeIs('invoices.*') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }} transition">
                         <i class="fa-solid fa-file-invoice-dollar w-6"></i>
                         <span>Invoices</span>
                     </a>

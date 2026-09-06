@@ -100,13 +100,14 @@
 
     <div class="max-w-4xl mx-auto mt-6">
         <div class="flex flex-col sm:flex-row justify-end gap-3">
-            <a href="{{ route('inspection.pdf', ['id' => $inspection->id, 'template_type' => 'template1']) }}"
-                class="px-5 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 font-bold rounded-xl text-sm transition-colors shadow-sm border border-red-200 flex items-center justify-center">
-                <i class="fa-solid fa-file-pdf mr-2 text-lg"></i> Generate PDF (Classic)
+            <a href="{{ route('inspection.pdf', $inspection->id) }}"
+                class="px-5 py-2.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold rounded-xl text-sm transition-colors shadow-sm border border-emerald-200 flex items-center justify-center">
+                <i class="fa-solid fa-file-pdf mr-2 text-lg"></i> Generate PDF Report
             </a>
-            <a href="{{ route('inspection.pdf', ['id' => $inspection->id, 'template_type' => 'template2']) }}"
-                class="px-5 py-2.5 bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold rounded-xl text-sm transition-colors shadow-sm border border-blue-200 flex items-center justify-center">
-                <i class="fa-solid fa-file-pdf mr-2 text-lg"></i> Generate PDF (Table)
+            
+            <a href="{{ route('invoices.create', ['inspection_id' => $inspection->id]) }}"
+                class="px-5 py-2.5 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold rounded-xl text-sm transition-colors shadow-sm border border-blue-200 flex items-center justify-center">
+                <i class="fa-solid fa-file-invoice-dollar mr-2 text-lg"></i> Generate Invoice
             </a>
         </div>
     </div>

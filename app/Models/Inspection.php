@@ -9,17 +9,19 @@ class Inspection extends Model
 {
     // Tambah 'user_id' di sini supaya Laravel benarkan ia disimpan
     protected $fillable = [
+        'company_id',
+        'template_id',
         'user_id',
         'title',
         'clientname',
-        'cus_no',
-        'cus_email',
-        'inspection_date',
         'address',
         'state',
         'type',
         'img',
-        'layout_img'
+        'layout_img',
+        'cus_no',
+        'cus_email',
+        'inspection_date',
     ];
 
     public function user()
@@ -58,4 +60,15 @@ class Inspection extends Model
             $this->layout_img, now()->addMinutes(60)
         );
     }
+  public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    public function template()
+    {
+        return $this->belongsTo(Template::class);
+    }
+
+    
 }

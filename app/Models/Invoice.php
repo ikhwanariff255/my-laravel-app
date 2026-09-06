@@ -21,4 +21,8 @@ class Invoice extends Model
     {
         return $this->hasMany(InvoiceDetail::class); // Sesuaikan nama kelas jika berbeza (cth: InvoiceItem)
     }
+    public function company()
+{
+    return $this->belongsTo(Company::class);
+}
 }
