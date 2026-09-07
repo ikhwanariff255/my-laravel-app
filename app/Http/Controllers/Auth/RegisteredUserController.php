@@ -28,24 +28,34 @@ class RegisteredUserController extends Controller
      *
      * @throws \Illuminate\Validation\ValidationException
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request)
     {
-        $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
-        ]);
+        $currentUser = Auth::user();
+        $company = $currentUser->company; // Dapatkan syarikat pengguna yang sedang login
 
-        $user = User::create([
+        // 1. Semak jika syarikat mempunyai pakej
+        if (!$company || !$company->package) {
+            return back()->withErrors(['error' => 'Syarikat anda tiada pakej langganan yang sah.']);
+        }
+
+        // 2. Kira jumlah pengguna yang telah berdaftar di bawah company_id ini
+        $currentUsersCount = \App\Models\User::where('company_id', $company->id)->count();
+        $maxUsersAllowed = $company->package->max_users; // Had daripada pakej (cth: 3 pengguna)
+
+        // 3. Sekat jika sudah mencapai had maksimum pakej
+        if ($currentUsersCount >= $maxUsersAllowed) {
+            return back()->withErrors(['error' => "Had bilangan staf untuk pakej anda telah penuh ({$maxUsersAllowed} pengguna sahaja). Sila naik taraf pakej."]);
+        }
+
+        // 4. Teruskan proses daftar staf baru
+        \App\Models\User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => Hash::make($request->password),
+            'password' => bcrypt($request->password),
+            'company_id' => $company->id,
+            'role' => 'staff', // Tetapkan sebagai staf biasa
         ]);
 
-        event(new Registered($user));
-
-        Auth::login($user);
-
-        return redirect(RouteServiceProvider::HOME);
+        return redirect()->back()->with('success', 'Staf berjaya didaftarkan!');
     }
 }

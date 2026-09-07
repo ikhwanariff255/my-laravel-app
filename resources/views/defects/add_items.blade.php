@@ -165,6 +165,7 @@
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/compressorjs/1.2.1/compressor.min.js"></script>
 
 <script>
     const defectData = {
@@ -626,5 +627,70 @@
             closeDrawModal();
         }, 'image/jpeg', 0.85);
     };
+
+    document.getElementById('imageInput').addEventListener('change', function (e) {
+    const files = e.target.files;
+    const formData = new FormData();
+    
+    // Ambil data lain dari form (cth: location, category, defect, dll)
+    formData.append('location', document.getElementById('location').value);
+    formData.append('category', document.getElementById('category').value);
+    formData.append('defect', document.getElementById('defect').value);
+    formData.append('description', document.getElementById('description').value);
+    formData.append('mx', window.markX || 0);
+    formData.append('my', window.markY || 0);
+
+    let processedCount = 0;
+    const totalFiles = files.length;
+
+    if (totalFiles === 0) return;
+
+    // Gelung setiap fail gambar yang dipilih
+    Array.from(files).forEach((file) => {
+        new Compressor(file, {
+            quality: 0.75,   // Kualiti 75% (Cantik & saiz kecil)
+            maxWidth: 1200,  // Lebar maksimum 1200px
+            success(result) {
+                // Masukkan hasil fail yang sudah diringankan ke dalam FormData
+                formData.append('images[]', result, file.name);
+                processedCount++;
+
+                // Apabila semua gambar selesai di-compress, baru hantar AJAX
+                if (processedCount === totalFiles) {
+                    sendAjaxUpload(formData);
+                }
+            },
+            error(err) {
+                console.error('Compression error:', err.message);
+                processedCount++;
+                if (processedCount === totalFiles) {
+                    sendAjaxUpload(formData);
+                }
+            },
+        });
+    });
+});
+
+// Fungsi untuk hantar data ke route storeRapid menggunakan AJAX (Fetch API)
+function sendAjaxUpload(formData) {
+    fetch("{{ route('defects.storeRapid', $inspection->id) }}", {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Defect berjaya disimpan dengan pantas!');
+            // Reset form atau papar notis berjaya di sini
+            location.reload(); 
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
 </script>
 @endsection

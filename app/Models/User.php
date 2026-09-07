@@ -24,6 +24,7 @@ class User extends Authenticatable
         'username',
         'password',
         'role',
+        'company_id',
     ];
 
     /**
@@ -62,4 +63,6 @@ class User extends Authenticatable
 {
     return $this->belongsTo(Company::class);
 }
+
+
 }

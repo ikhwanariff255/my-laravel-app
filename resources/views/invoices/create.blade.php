@@ -29,7 +29,7 @@
                     </div>
                 </div>
 
-                <hr class="my-6">
+                {{-- <hr class="my-6">
                 
                 <!-- Financial Expenses (Cash Out) -->
                 <h5 class="font-bold text-gray-800 mb-4"><i class="fas fa-wallet text-gray-500 mr-2"></i> Cash Out / Expenses (Optional)</h5>
@@ -42,7 +42,7 @@
                     <p class="text-xs text-gray-500 mt-2">Grand Total invois akan masuk ke <b>Cash In</b> secara automatik. Gaji staf yang diletakkan di sini akan auto-rekod sebagai <b>Cash Out</b>.</p>
                 </div>
 
-                <hr class="my-6">
+                <hr class="my-6"> --}}
                 
                 <!-- Invoice Items -->
                 <h5 class="font-bold text-gray-800 mb-4"><i class="fas fa-list text-gray-500 mr-2"></i> Invoice Items</h5>

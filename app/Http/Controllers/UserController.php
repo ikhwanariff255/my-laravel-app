@@ -13,8 +13,12 @@ class UserController extends Controller
     {
         $currentUser = Auth::user();
 
-        // Paparkan pengguna mengikut syarikat yang sama (Kecuali jika system admin global)
-        $users = User::where('company_id', $currentUser->company_id)->latest()->get();
+        // Paparkan pengguna mengikut syarikat yang sama
+        if ($currentUser->role === 'admin') {
+            $users = User::latest()->get(); // Super Admin nampak semua
+        } else {
+            $users = User::where('company_id', $currentUser->company_id)->latest()->get();
+        }
 
         return view('users.index', compact('users'));
     }
@@ -24,7 +28,7 @@ class UserController extends Controller
         return view('users.create');
     }
 
-    // 3. Simpan pengguna baharu (Dilengkapi logik had staf & company_id)
+    // Simpan pengguna baharu (Menggunakan had max_users daripada pakej syarikat)
     public function store(Request $request)
     {
         $request->validate([
@@ -32,38 +36,40 @@ class UserController extends Controller
             'username' => 'required|string|max:255|unique:users',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
-            'role' => 'required|in:admin,staff,owner',
+            'role' => 'required|in:admin,company_admin,staff', // <-- Diperbetulkan kepada company_admin
         ]);
 
         $currentUser = Auth::user();
 
-        if (!$currentUser->company_id) {
+        if (!$currentUser->company_id && $currentUser->role !== 'admin') {
             return back()->with('error', 'Akaun anda tidak diikat pada sebarang syarikat.');
         }
 
-        // --- LOGIK KAWALAN HAD STAF (STAFF LIMIT) ---
-        $currentStaffCount = User::where('company_id', $currentUser->company_id)->count();
+        $company = $currentUser->company;
 
-        // Had default mengikut pakej biasa (Contoh: Pakej asas = 2 staf)
-        $allowedLimit = 2; 
-        
-        // Berikan kelonggaran / had tinggi untuk akaun legacy (Contoh: ID syarikat 2 dan 3)
-        if (in_array($currentUser->company_id, [2, 3])) {
-            $allowedLimit = 50; 
-        } 
-        // ---------------------------------------------
+        // --- LOGIK KAWALAN HAD STAF (MERUJUK KEPADA PAKEJ SYARIKAT) ---
+        if ($company && $company->package) {
+            $currentStaffCount = User::where('company_id', $company->id)->count();
+            $maxUsersAllowed = $company->package->max_users; // Had daripada pakej (cth: 3)
 
-        if ($currentStaffCount >= $allowedLimit) {
-            return back()->with('error', 'Had bilangan staf bagi pakej syarikat anda telah penuh. Sila naik taraf pakej.');
+            if ($currentStaffCount >= $maxUsersAllowed) {
+                return back()->with('error', "Had bilangan pengguna bagi pakej syarikat anda telah penuh ({$maxUsersAllowed} pengguna sahaja). Sila naik taraf pakej.");
+            }
         }
+        // -------------------------------------------------------------
+
+        // Tentukan company_id: Jika Super Admin, ambil dari input borang. Jika Company Admin, guna company sendiri.
+        $companyId = $currentUser->role === 'admin' 
+            ? $request->company_id 
+            : $currentUser->company_id;
 
         User::create([
-            'company_id' => $currentUser->company_id, // Wajib ada untuk multi-tenancy
-            'name' => $request->name,
-            'username' => $request->username,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'role' => $request->role,
+            'company_id' => $companyId, // <-- Menyesuaikan ikut siapa yang login
+            'name'       => $request->name,
+            'username'   => $request->username,
+            'email'      => $request->email,
+            'password'   => Hash::make($request->password),
+            'role'       => $request->role,
         ]);
 
         return redirect()->route('users.index')->with('success', 'Pengguna berjaya didaftarkan!');
@@ -74,14 +80,14 @@ class UserController extends Controller
         return view('users.edit', compact('user'));
     }
 
-    // 5. Kemas kini data pengguna
+    // Kemas kini data pengguna
     public function update(Request $request, User $user)
     {
         $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255|unique:users,username,' . $user->id,
             'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
-            'role' => 'required|in:admin,staff,owner',
+            'role' => 'required|in:admin,company_admin,staff', // <-- Diperbetulkan kepada company_admin
         ]);
 
         $data = [

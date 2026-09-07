@@ -23,7 +23,15 @@ class InspectionController extends Controller
 
     public function create()
     {
-        $staffs = User::all();
+        $currentUser = Auth::user();
+
+        // Jika Super Admin, boleh pilih semua staf. Jika Company Admin, hanya staf syarikat sendiri.
+        if ($currentUser->role === 'admin') {
+            $staffs = User::all();
+        } else {
+            $staffs = User::where('company_id', $currentUser->company_id)->get();
+        }
+
         return view('inspections.create', compact('staffs'));
     }
 
@@ -46,22 +54,6 @@ class InspectionController extends Controller
 
         if (!$user->company_id) {
             return back()->with('error', 'Akaun anda tidak diikat pada sebarang syarikat.');
-        }
-
-        $reportLimit = 50;
-
-        $currentMonthCount = Inspection::where('company_id', $user->company_id)
-            ->whereMonth('created_at', now()->month)
-            ->whereYear('created_at', now()->year)
-            ->count();
-
-        if ($currentMonthCount >= $reportLimit) {
-            $company = \App\Models\Company::find($user->company_id);
-            if ($company && $company->tokens_left > 0) {
-                $company->decrement('tokens_left');
-            } else {
-                return back()->with('error', 'Had laporan bulanan telah habis. Sila tambah token (RM14/report) atau naik taraf pakej.');
-            }
         }
 
         $imgPath = null;
@@ -122,7 +114,14 @@ class InspectionController extends Controller
 
     public function edit(Inspection $inspection)
     {
-        $staffs = User::all();
+        $currentUser = Auth::user();
+
+        if ($currentUser->role === 'admin') {
+            $staffs = User::all();
+        } else {
+            $staffs = User::where('company_id', $currentUser->company_id)->get();
+        }
+
         return view('inspections.edit', compact('inspection', 'staffs'));
     }
 
@@ -203,6 +202,30 @@ class InspectionController extends Controller
      */
     public function downloadPDF($id)
     {
+        $currentUser = Auth::user();
+        $company = $currentUser->company; 
+
+        if (!$company || !$company->package) {
+            return back()->with('error', 'Syarikat anda tidak mempunyai pakej langganan yang sah.');
+        }
+
+        $tokensLeft = $company->tokens_left ?? 0;        
+
+        // SEMAKAN: Semak baki token setiap kali butang generate ditekan
+        if ($tokensLeft <= 0) {
+            return redirect()->back()->with('error', 'Baki token anda adalah 0. Sila topup token untuk mencetak laporan.');
+        } else {
+            // Tolak 1 token serta-merta setiap kali PDF di-generate
+            $company->decrement('tokens_left');
+        }
+
+        // Increase memory and execution time
+        ini_set('memory_limit', '512M');
+        ini_set('max_execution_time', 300);
+
+        $startTime = microtime(true);
+        $inspection = Inspection::findOrFail($id);
+
         // Increase memory and execution time
         ini_set('memory_limit', '512M');
         ini_set('max_execution_time', 300);
@@ -518,7 +541,13 @@ class InspectionController extends Controller
 
     public function index(Request $request)
     {
+        $user = Auth::user(); 
+
         $query = Inspection::with('user')->latest();
+
+        if ($user->role !== 'admin') {
+            $query->where('company_id', $user->company_id);
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -544,7 +573,7 @@ class InspectionController extends Controller
             Storage::disk('s3')->delete($inspection->img);
         }
 
-        if ($inspection->layout_img && Storage::disk('s3')->exists($inspection->layout_img)) {
+        if ($inspection->layout_xml && Storage::disk('s3')->exists($inspection->layout_img)) {
             Storage::disk('s3')->delete($inspection->layout_img);
         }
 

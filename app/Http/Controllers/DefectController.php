@@ -7,6 +7,7 @@ use App\Models\Inspection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage; 
+use Illuminate\Support\Str;
 
 class DefectController extends Controller
 {
@@ -21,8 +22,17 @@ class DefectController extends Controller
 
         if ($request->hasFile('images')) {
             foreach ($request->file('images') as $file) {
-                // Changed 'public' to 's3'
-                $imagePaths[] = $file->store('defects', 's3');
+                // Proses compress gambar sebelum simpan ke S3
+                $compressedImageContent = $this->compressImage($file);
+                
+                if ($compressedImageContent) {
+                    $filename = 'defects/' . Str::uuid() . '.jpg';
+                    Storage::disk('s3')->put($filename, $compressedImageContent);
+                    $imagePaths[] = $filename;
+                } else {
+                    // Fallback jika proses compress gagal
+                    $imagePaths[] = $file->store('defects', 's3');
+                }
             }
         }
 
@@ -69,18 +79,24 @@ class DefectController extends Controller
             // Padam gambar lama dari AWS S3
             if (is_array($defect->img)) {
                 foreach ($defect->img as $oldImage) {
-                    // Changed 'public' to 's3'
                     if (Storage::disk('s3')->exists($oldImage)) {
                         Storage::disk('s3')->delete($oldImage);
                     }
                 }
             }
 
-            // Masukkan gambar baru ke S3
+            // Masukkan gambar baru yang telah di-compress ke S3
             $imagePaths = [];
             foreach ($request->file('images') as $file) {
-                // Changed 'public' to 's3'
-                $imagePaths[] = $file->store('defects', 's3');
+                $compressedImageContent = $this->compressImage($file);
+                
+                if ($compressedImageContent) {
+                    $filename = 'defects/' . Str::uuid() . '.jpg';
+                    Storage::disk('s3')->put($filename, $compressedImageContent);
+                    $imagePaths[] = $filename;
+                } else {
+                    $imagePaths[] = $file->store('defects', 's3');
+                }
             }
             $defect->img = $imagePaths;
         }
@@ -96,7 +112,6 @@ class DefectController extends Controller
         // Padam gambar dari AWS S3 sebelum delete rekod
         if (is_array($defect->img)) {
             foreach ($defect->img as $image) {
-                // Changed 'public' to 's3'
                 if (Storage::disk('s3')->exists($image)) {
                     Storage::disk('s3')->delete($image);
                 }
@@ -106,5 +121,72 @@ class DefectController extends Controller
         $defect->delete();
 
         return redirect()->back()->with('success', 'Defect berjaya dipadam.');
+    }
+
+    /**
+     * Fungsi untuk mengecilkan saiz fail gambar tanpa merosakkan kualiti visual & bentuk.
+     */
+    private function compressImage($file, $maxWidth = 900, $quality = 75)
+    {
+        $path = $file->getRealPath();
+    
+    // Jika saiz fail asal kurang dari 500KB, terus guna fail asal (tak perlu compress berat-berat)
+    if (filesize($path) < 500 * 1024) {
+        return file_get_contents($path);
+    }
+
+    list($origWidth, $origHeight, $imageType) = getimagesize($path);
+
+        // Baca imej mengikut format asal
+        switch ($imageType) {
+            case IMAGETYPE_JPEG:
+                $sourceImage = @imagecreatefromjpeg($path);
+                break;
+            case IMAGETYPE_PNG:
+                $sourceImage = @imagecreatefrompng($path);
+                break;
+            case IMAGETYPE_WEBP:
+                $sourceImage = @imagecreatefromwebp($path);
+                break;
+            default:
+                return null; // Format tidak disokong, hantar null (guna method asal)
+        }
+
+        if (!$sourceImage) {
+            return null;
+        }
+
+        // Kira dimensi baru secara berkadar (proportional) supaya bentuk gambar tak rosak/lonjong
+        $targetWidth = $origWidth;
+        $targetHeight = $origHeight;
+
+        if ($origWidth > $maxWidth) {
+            $targetWidth = $maxWidth;
+            $targetHeight = round(($origHeight / $origWidth) * $maxWidth);
+        }
+
+        // Cipta imej kosong baru dengan saiz yang telah dioptimumkan
+        $targetImage = imagecreatetruecolor($targetWidth, $targetHeight);
+
+        // Kekalkan latar belakang telus (transparent) jika fail asal adalah PNG/WebP
+        if ($imageType == IMAGETYPE_PNG || $imageType == IMAGETYPE_WEBP) {
+            imagecolortransparent($targetImage, imagecolorallocatealpha($targetImage, 0, 0, 0, 127));
+            imagealphablending($targetImage, false);
+            imagesavealpha($targetImage, true);
+        }
+
+        // Salin dan ubah saiz gambar asal ke imej baharu
+        imagecopyresampled($targetImage, $sourceImage, 0, 0, 0, 0, $targetWidth, $targetHeight, $origWidth, $origHeight);
+
+        // Tangkap hasil output ke dalam bentuk string data (Buffer) dalamformat JPEG
+        ob_start();
+        imagejpeg($targetImage, null, $quality);
+        $compressedData = ob_get_clean();
+
+        // Bersihkan memori pelayan
+        imagedestroy($sourceImage);
+        imagedestroy($targetImage);
+
+        return $compressedData;
     }
 }

@@ -1,7 +1,16 @@
 @extends('layouts.app')
 
 @section('content')
-
+@if(session('error') || $errors->any())
+        <div class="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-xl shadow-sm flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-triangle-exclamation text-xl text-red-600"></i>
+                <span class="text-sm font-semibold">
+                    {{ session('error') ?? $errors->first('error') }}
+                </span>
+            </div>
+        </div>
+    @endif
     <style>
         /* CSS Override to change Pagination color to Emerald theme */
         nav[role="navigation"] a,
@@ -99,18 +108,45 @@
     </div>
 
     <div class="max-w-4xl mx-auto mt-6">
-        <div class="flex flex-col sm:flex-row justify-end gap-3">
+    <div class="flex flex-col sm:flex-row justify-end gap-3">
+        
+        @php
+            $currentUser = Auth::user();
+            $company = $currentUser->company;
+            $reportsThisMonth = \App\Models\Inspection::where('company_id', $company->id ?? 0)
+                ->whereMonth('created_at', now()->month)
+                ->whereYear('created_at', now()->year)
+                ->count();
+            $maxReports = $company->package->max_reports ?? 0;
+            $tokensLeft = $company->tokens_left ?? 0;
+            
+            // Kunci butang jika laporan sudah capai/lebih had DAN token 0
+            $isLocked = ($reportsThisMonth >= $maxReports && $tokensLeft <= 0);
+        @endphp
+
+        @if($isLocked)
+            <!-- Jika token & kuota habis, paparkan butang disabled / amaran -->
+            <button type="button" disabled
+                class="px-5 py-2.5 bg-gray-200 text-gray-400 font-bold rounded-xl text-sm shadow-sm border border-gray-300 flex items-center justify-center cursor-not-allowed">
+                <i class="fa-solid fa-ban mr-2 text-lg"></i> Token Habis (Sila Topup)
+            </button>
+        @else
+            <!-- Jika masih ada kuota atau token -->
             <a href="{{ route('inspection.pdf', $inspection->id) }}"
                 class="px-5 py-2.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold rounded-xl text-sm transition-colors shadow-sm border border-emerald-200 flex items-center justify-center">
-                <i class="fa-solid fa-file-pdf mr-2 text-lg"></i> Generate PDF Report
+                <i class="fa-solid fa-file-pdf mr-2 text-lg"></i> Generate PDF Report 
+                @if($reportsThisMonth >= $maxReports)
+                    <span class="ml-2 px-1.5 py-0.5 bg-amber-100 text-amber-800 text-xs rounded-full">(-1 Token)</span>
+                @endif
             </a>
-            
-            <a href="{{ route('invoices.create', ['inspection_id' => $inspection->id]) }}"
-                class="px-5 py-2.5 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold rounded-xl text-sm transition-colors shadow-sm border border-blue-200 flex items-center justify-center">
-                <i class="fa-solid fa-file-invoice-dollar mr-2 text-lg"></i> Generate Invoice
-            </a>
-        </div>
+        @endif
+        
+        <a href="{{ route('invoices.create', ['inspection_id' => $inspection->id]) }}"
+            class="px-5 py-2.5 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold rounded-xl text-sm transition-colors shadow-sm border border-blue-200 flex items-center justify-center">
+            <i class="fa-solid fa-file-invoice-dollar mr-2 text-lg"></i> Generate Invoice
+        </a>
     </div>
+</div>
 
     <div class="max-w-6xl mx-auto mt-8">
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

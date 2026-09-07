@@ -56,35 +56,21 @@
                 </a>
 
                 <!-- ================= TAMBAHAN MENU KEUANGAN / INVOICE ================= -->
-                @if(Auth::user()->role == 'admin' || Auth::user()->role == 'owner')
+                @if(Auth::user()->role == 'admin' || Auth::user()->role == 'company_admin')
                 <div class="pt-4 mt-4 border-t border-slate-800">
                     <p class="px-4 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Financials</p>
                     
-                    <!-- Link Invoices -->
                     <!-- Link Invoices -->
                     <a href="{{ route('invoices.index') }}" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg {{ request()->routeIs('invoices.*') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }} transition">
                         <i class="fa-solid fa-file-invoice-dollar w-6"></i>
                         <span>Invoices</span>
                     </a>
-
-                    <!-- Link Cash Flow -->
-                    <a href="{{ route('cashflow.index') }}" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg {{ request()->routeIs('cashflow.*') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }} transition-colors">
-                        <i class="fa-solid fa-wallet w-6"></i>
-                        <span>Cash Flow</span>
-                    </a>
-
-                    <!-- Tambah Link Report Gaji Di Sini -->
-                    <a href="{{ route('reports.part_time') }}" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg {{ request()->routeIs('reports.part_time') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }} transition-colors">
-                        <i class="fa-solid fa-chart-pie w-6"></i>
-                        <span>Part-Time Report</span>
-                    </a>
-                    
                 </div>
                 @endif
                 <!-- ================================================================= -->
 
                 <!-- ================= TAMBAHAN MENU PENGGUNA ================= -->
-                @if(Auth::user()->role == 'admin' || Auth::user()->role == 'owner')
+                @if(Auth::user()->role == 'admin' || Auth::user()->role == 'company_admin')
                 <div class="pt-4 mt-4 border-t border-slate-800">
                     <p class="px-4 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Management</p>
                     
@@ -98,8 +84,42 @@
                 <!-- ========================================================= -->
 
             </nav>
+            @php
+    $user = Auth::user();
+    $company = $user->company ?? null;
+    
+    // Kira jumlah laporan yang dah dibuat bulan ni
+    $reportsThisMonth = 0;
+    $maxReports = 0;
+    
+    if ($company) {
+        $reportsThisMonth = \App\Models\Inspection::where('company_id', $company->id)
+            ->whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
+            ->count();
+            
+        $maxReports = $company->package->max_reports ?? 0;
+    }
+@endphp
 
-            <!-- Profil Ringkas Bawah Sidebar -->
+@if($company)
+    <div class="p-4 bg-gray-50 rounded-xl border border-gray-200 text-sm space-y-2 mb-6">
+        <div class="flex justify-between font-bold text-gray-700">
+            <span>Pakej Semasa:</span>
+            <span class="text-emerald-600">{{ $company->package->name ?? 'Tiada Pakej' }}</span>
+        </div>
+        <div class="flex justify-between text-gray-600">
+            <span>Kuota Laporan Bulan Ini:</span>
+            <span class="font-semibold">{{ $reportsThisMonth }} / {{ $maxReports }}</span>
+        </div>
+        <div class="flex justify-between text-gray-600">
+            <span>Baki Token Ekstra:</span>
+            <span class="font-semibold text-blue-600">{{ $company->tokens_left ?? 0 }}</span>
+        </div>
+    </div>
+@endif
+
+            {{-- <!-- Profil Ringkas Bawah Sidebar -->
             <div class="p-4 border-t border-slate-800">
                 <div class="flex items-center gap-3 px-4 py-2">
                     <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-300">
@@ -107,10 +127,40 @@
                     </div>
                     <div class="flex-1 overflow-hidden">
                         <p class="text-sm font-medium text-white truncate">{{ Auth::user()->name }}</p>
-                        <p class="text-xs text-slate-400 truncate text-transform: capitalize">{{ Auth::user()->role ?? 'Staff' }}</p>
+                        <p class="text-xs text-slate-400 truncate capitalize">{{ Auth::user()->role ?? 'Staff' }}</p>
                     </div>
                 </div>
+            </div> --}}
+
+            <!-- Profil Ringkas & Baki Token Bawah Sidebar -->
+            <div class="p-4 border-t border-slate-800 space-y-3">
+                
+                <!-- Kotak Paparan Baki Token -->
+                @if(Auth::user()->company)
+                <div class="bg-slate-800/80 px-3 py-2 rounded-xl border border-slate-700/50 flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-coins text-amber-400 text-sm"></i>
+                        <span class="text-xs text-slate-300 font-medium">Token Left</span>
+                    </div>
+                    <span class="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs font-bold rounded-md">
+                        {{ Auth::user()->company->tokens_left ?? 0 }}
+                    </span>
+                </div>
+                @endif
+
+                <!-- Info Profil Pengguna -->
+                <div class="flex items-center gap-3 px-2">
+                    <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-300">
+                        {{ substr(Auth::user()->name, 0, 1) }}
+                    </div>
+                    <div class="flex-1 overflow-hidden">
+                        <p class="text-sm font-medium text-white truncate">{{ Auth::user()->name }}</p>
+                        <p class="text-xs text-slate-400 truncate capitalize">{{ Auth::user()->role ?? 'Staff' }}</p>
+                    </div>
+                </div>
+
             </div>
+
         </aside>
 
         <!-- ==================== MAIN CONTENT AREA ==================== -->

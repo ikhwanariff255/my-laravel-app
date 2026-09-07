@@ -47,9 +47,26 @@ class AuthenticatedSessionController extends Controller
         ]);
     }
 
+    // $request->session()->regenerate();
+
     $request->session()->regenerate();
 
-    return redirect()->intended(route('dashboard', absolute: false));
+    // Dapatkan pengguna yang baru log masuk
+    $user = Auth::user();
+
+    // Pengalihan mengikut role masing-masing
+    if ($user->role === 'admin') {
+        // Super Admin utama masuk ke panel Filament
+        return redirect()->intended('/admin'); 
+    } 
+    elseif ($user->role === 'company_admin') {
+        // Owner / Admin Syarikat masuk ke dashboard khas syarikat mereka
+        return redirect()->intended(route('dashboard')); // (Atau tukar ke route dashboard syarikat jika ada)
+    } 
+    else {
+        // Staf biasa masuk ke dashboard staf
+        return redirect()->intended(route('dashboard'));
+    }
 }
 
     /**
