@@ -81,9 +81,32 @@
         
         .minimap-img { max-width: 160px; max-height: 120px; object-fit: cover; object-position: center; border: 1px solid #cbd5e0; }
         
-        .evidence-container { width: 100%; text-align: center; padding: 10px 0; }
-        .evidence-wrapper { display: flex; gap: 5px; margin-top: 5px; justify-content: center; flex-wrap: wrap; }
-        .evidence-img { max-width: 200px; max-height: 150px; object-fit: contain; border: 1px solid #e2e8f0; padding: 3px; }
+        /* ================= EVIDENCE IMAGES (SEBARIS & NASBAH ASAL) ================= */
+        .evidence-container { width: 100%; text-align: center; padding: 5px 0; }
+        
+        .evidence-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            border: none !important; 
+            table-layout: fixed; 
+            margin: 0 auto; 
+        }
+        
+        .evidence-table td { 
+            border: none !important; 
+            padding: 2px; 
+            text-align: center; 
+            vertical-align: middle; 
+        }
+        
+        .evidence-img { 
+            max-width: 100%; 
+            max-height: 120px; /* Kawal tinggi maksimum supaya jadual tak terlalu tinggi */
+            height: auto; 
+            width: auto; 
+            border: 1px solid #e2e8f0; 
+            display: inline-block; 
+        }
         .evidence-empty { color: #9ca3af; font-size: 10px; }
 
     </style>
@@ -107,39 +130,39 @@
             <tr>
                 <!-- KIRI -->
                 <td style="width: 42%; background-color: #ffffff; vertical-align: top; padding: 50px 30px 30px 45px; position: relative;">
-    @php
-        $logoPath = public_path('assets/img/defectguru_logo.png');
-    @endphp
+                    @php
+                        $logoPath = public_path('assets/img/defectguru_logo.png');
+                    @endphp
 
-    @if(file_exists($logoPath))
-        <img src="{{ getBase64Image($logoPath) }}" style="width: 100%; max-width: 240px; margin-bottom: 25px; display: block;" alt="Logo">
-    @else
-        <div style="font-size: 22pt; font-weight: bold; margin-bottom: 25px;">DEFECT GURU</div>
-    @endif
+                    @if(file_exists($logoPath))
+                        <img src="{{ getBase64Image($logoPath) }}" style="width: 100%; max-width: 240px; margin-bottom: 25px; display: block;" alt="Logo">
+                    @else
+                        <div style="font-size: 22pt; font-weight: bold; margin-bottom: 25px;">DEFECT GURU</div>
+                    @endif
 
-    <div style="font-size: 24pt; font-weight: 900; margin-bottom: 20px; line-height: 1.15; color: #000; letter-spacing: -0.5px;">
-        HOME<br>DEFECT<br>INSPECTION<br>REPORT
-    </div>
-    
-    <div style="border-bottom: 2.5px solid #000; width: 100%; margin-bottom: 15px;"></div>
+                    <div style="font-size: 24pt; font-weight: 900; margin-bottom: 20px; line-height: 1.15; color: #000; letter-spacing: -0.5px;">
+                        HOME<br>DEFECT<br>INSPECTION<br>REPORT
+                    </div>
+                    
+                    <div style="border-bottom: 2.5px solid #000; width: 100%; margin-bottom: 15px;"></div>
 
-    <div class="info-label" style="margin-top: 0;">PROJECT:</div>
-    <div class="info-value">{{ $inspection->title }}</div>
-    
-    <div class="info-label">NAME:</div>
-    <div class="info-value">{{ $inspection->clientname }}</div>
-    
-    <div class="info-label">ADDRESS:</div>
-    <div class="info-value">{{ $inspection->address }}<br>{{ $inspection->state }}</div>
-    
-    <div class="info-label">CONTACT NO:</div>
-    <div class="info-value">{{ $inspection->cus_no ?? $inspection->contact ?? '-' }}</div>
-    
-    <div class="info-label">EMAIL:</div>
-    <div class="info-value" style="text-transform: none;">{{ $inspection->cus_email ?? $inspection->email ?? '-' }}</div>
+                    <div class="info-label" style="margin-top: 0;">PROJECT:</div>
+                    <div class="info-value">{{ $inspection->title }}</div>
+                    
+                    <div class="info-label">NAME:</div>
+                    <div class="info-value">{{ $inspection->clientname }}</div>
+                    
+                    <div class="info-label">ADDRESS:</div>
+                    <div class="info-value">{{ $inspection->address }}<br>{{ $inspection->state }}</div>
+                    
+                    <div class="info-label">CONTACT NO:</div>
+                    <div class="info-value">{{ $inspection->cus_no ?? $inspection->contact ?? '-' }}</div>
+                    
+                    <div class="info-label">EMAIL:</div>
+                    <div class="info-value" style="text-transform: none;">{{ $inspection->cus_email ?? $inspection->email ?? '-' }}</div>
 
-    <div class="info-label">NO. SSM / CIDB:</div>
-    <div class="info-value">/ 0120250519-SL155063</div>
+                    <div class="info-label">NO. SSM / CIDB:</div>
+                    <div class="info-value">/ 0120250519-SL155063</div>
                 
                 <!-- KANAN: Gambar Rumah (Col: img) -->
                 <td style="width: 58%; background-color: #e2e8f0; padding: 0; vertical-align: top;">
@@ -184,7 +207,11 @@
 
     <!-- ================= 3. FLOOR PLAN ================= -->
     <div class="section-title">Floor Plan</div>
-    @if($inspection->layout_img && file_exists(public_path('storage/' . $inspection->layout_img)))
+    @if(isset($plainLayoutPath) && file_exists($plainLayoutPath))
+        <div class="plan-box">
+            <img src="{{ getBase64Image($plainLayoutPath) }}" class="plan-img">
+        </div>
+    @elseif($inspection->layout_img && file_exists(public_path('storage/' . $inspection->layout_img)))
         <div class="plan-box">
             <img src="{{ getBase64Image(public_path('storage/' . $inspection->layout_img)) }}" class="plan-img">
         </div>
@@ -255,20 +282,29 @@
                     <td class="val-col">{!! nl2br(e($defect->desc)) !!}</td>
                 </tr>
                 
-                <!-- ================= FIX: EVIDENCE IMAGES WITH BASE64 ENCODING ================= -->
+                <!-- ================= EVIDENCE IMAGES WITH BASE64 ENCODING ================= -->
                 <tr>
-                    <td colspan="3">
+                    <td colspan="3" style="padding: 5px;">
                         <div class="evidence-container">
                             @if(!empty($defect->local_evidence) && is_array($defect->local_evidence) && count($defect->local_evidence) > 0)
-                                <div class="evidence-wrapper">
-                                    @foreach($defect->local_evidence as $localPath)
-                                        @if(file_exists($localPath))
-                                            <img src="{{ getBase64Image($localPath) }}" class="evidence-img" alt="Evidence">
-                                        @endif
-                                    @endforeach
-                                </div>
+                                @php
+                                    $evidenceList = array_slice($defect->local_evidence, 0, 4);
+                                    $totalImg = count($evidenceList);
+                                    $colWidth = floor(100 / $totalImg);
+                                @endphp
+                                <table class="evidence-table">
+                                    <tr>
+                                        @foreach($evidenceList as $localImg)
+                                            @if(file_exists($localImg))
+                                                <td style="width: {{ $colWidth }}%;">
+                                                    <img src="{{ getBase64Image($localImg) }}" class="evidence-img">
+                                                </td>
+                                            @endif
+                                        @endforeach
+                                    </tr>
+                                </table>
                             @else
-                                <span class="evidence-empty">No evidence images</span>
+                                <span style="color: #a0aec0; font-size: 9pt;">No image evidence</span>
                             @endif
                         </div>
                     </td>

@@ -199,22 +199,21 @@ class InspectionController extends Controller
     }
 
     /**
-     * OPTIMIZED: Generate PDF with parallel S3 image downloads
-     * Reduces timeout issues by downloading all images concurrently instead of sequentially
+     * Generate PDF with parallel S3 downloads and memory optimisation
      */
     public function downloadPDF($id)
     {
+        // Increase memory and execution time
+        ini_set('memory_limit', '512M');
+        ini_set('max_execution_time', 300);
+
         $startTime = microtime(true);
-        
-        // Fetch inspection with defects
         $inspection = Inspection::findOrFail($id);
-        
-        // Get company settings
-// Get company settings
-// $settings = CompanySetting::first();
+
         // ==================== SECTION 1: Process Layout Images ====================
         $locationMaps = [];
         $indicatedPath = null;
+        $plainLayoutPath = null;
         $imgData = null;
 
         if ($inspection->layout_img && Storage::disk('s3')->exists($inspection->layout_img)) {
@@ -224,8 +223,12 @@ class InspectionController extends Controller
         Storage::disk('public')->makeDirectory('inspections');
 
         if ($imgData) {
-            $img = @imagecreatefromstring($imgData);
+            // Save plain layout (no markers)
+            $plainLayoutPath = storage_path('app/public/inspections/plain_layout_'.$id.'.jpg');
+            file_put_contents($plainLayoutPath, $imgData);
 
+            // Create indicated layout with markers
+            $img = @imagecreatefromstring($imgData);
             if ($img) {
                 $width = imagesx($img);
                 $height = imagesy($img);
@@ -244,9 +247,10 @@ class InspectionController extends Controller
 
                 $indicatedFilename = 'indicated_'.$id.'_'.time().'.jpg';
                 $indicatedPath = storage_path('app/public/inspections/'.$indicatedFilename);
-                imagejpeg($img, $indicatedPath, 90);
+                imagejpeg($img, $indicatedPath, 85);
                 imagedestroy($img);
 
+                // Location-specific maps
                 $groupedDefects = $inspection->defects->groupBy(function ($item) {
                     return ! empty($item->location) ? strtoupper(trim($item->location)) : 'UNSPECIFIED LOCATION';
                 });
@@ -271,165 +275,152 @@ class InspectionController extends Controller
 
                         $locFilename = 'indicated_loc_'.md5($location).'_'.$id.'_'.time().'.jpg';
                         $locFullPath = storage_path('app/public/inspections/'.$locFilename);
-                        imagejpeg($locImg, $locFullPath, 90);
+                        imagejpeg($locImg, $locFullPath, 85);
                         $locationMaps[$location] = $locFullPath;
                         imagedestroy($locImg);
                     }
                 }
-            }
 
-            foreach ($inspection->defects as $defect) {
-                if ($defect->mark_x > 0 || $defect->mark_y > 0) {
-                    $singleImg = @imagecreatefromstring($imgData);
-                    if ($singleImg) {
-                        $sW = imagesx($singleImg);
-                        $sH = imagesy($singleImg);
-                        $sRed = imagecolorallocate($singleImg, 255, 0, 0);
-                        $sWhite = imagecolorallocate($singleImg, 255, 255, 255);
-                        $sSize = max(25, round($sW / 30));
+                // Individual defect maps
+                foreach ($inspection->defects as $defect) {
+                    if ($defect->mark_x > 0 || $defect->mark_y > 0) {
+                        $singleImg = @imagecreatefromstring($imgData);
+                        if ($singleImg) {
+                            $sW = imagesx($singleImg);
+                            $sH = imagesy($singleImg);
+                            $sRed = imagecolorallocate($singleImg, 255, 0, 0);
+                            $sWhite = imagecolorallocate($singleImg, 255, 255, 255);
+                            $sSize = max(25, round($sW / 30));
 
-                        $sPx = ($defect->mark_x / 100) * $sW;
-                        $sPy = ($defect->mark_y / 100) * $sH;
-                        imagefilledellipse($singleImg, $sPx, $sPy, $sSize, $sSize, $sRed);
-                        imageellipse($singleImg, $sPx, $sPy, $sSize, $sSize, $sWhite);
+                            $sPx = ($defect->mark_x / 100) * $sW;
+                            $sPy = ($defect->mark_y / 100) * $sH;
+                            imagefilledellipse($singleImg, $sPx, $sPy, $sSize, $sSize, $sRed);
+                            imageellipse($singleImg, $sPx, $sPy, $sSize, $sSize, $sWhite);
 
-                        $mapFilename = 'map_defect_'.$defect->id.'.jpg';
-                        $mapFullPath = storage_path('app/public/inspections/'.$mapFilename);
-                        imagejpeg($singleImg, $mapFullPath, 90);
-                        imagedestroy($singleImg);
+                            $mapFilename = 'map_defect_'.$defect->id.'.jpg';
+                            $mapFullPath = storage_path('app/public/inspections/'.$mapFilename);
+                            imagejpeg($singleImg, $mapFullPath, 85);
+                            imagedestroy($singleImg);
 
-                        $defect->single_map_path = $mapFullPath;
+                            $defect->single_map_path = $mapFullPath;
+                        }
                     }
                 }
             }
         }
 
-        // ==================== SECTION 2: OPTIMIZED - Download Cover Image ====================
+        // ==================== SECTION 2: Download Cover Image (parallel) ====================
+        $coverPromise = null;
         $tempCoverImage = null;
+        $client = new Client();
+
         if ($inspection->img && Storage::disk('s3')->exists($inspection->img)) {
-            try {
-                $coverData = Storage::disk('s3')->get($inspection->img);
-                $tempCoverImage = storage_path('app/public/inspections/cover_'.time().'.jpg');
-                file_put_contents($tempCoverImage, $coverData);
+            $s3Client = Storage::disk('s3')->getClient();
+            $coverPromise = $s3Client->getObjectAsync([
+                'Bucket' => config('filesystems.disks.s3.bucket'),
+                'Key'    => $inspection->img,
+            ])->then(
+                function ($result) use (&$tempCoverImage) {
+                    $tempCoverImage = $this->compressAndSaveImage((string) $result['Body'], 70);
+                    return $tempCoverImage;
+                },
+                function ($reason) {
+                    Log::error("Cover image download failed: ".$reason);
+                    return null;
+                }
+            );
+        }
+
+        // ==================== SECTION 3: Download Evidence Images in Parallel ====================
+        $evidenceMap = $this->downloadEvidenceImagesParallel($inspection);
+
+        // Wait for cover download to finish (if any)
+        if ($coverPromise) {
+            $tempCoverImage = $coverPromise->wait();
+            if ($tempCoverImage) {
                 $inspection->local_cover = $tempCoverImage;
-            } catch (\Exception $e) {
-                Log::error("Error downloading cover image: ".$e->getMessage());
             }
         }
 
-        // ==================== SECTION 3: OPTIMIZED - Parallel Download of Evidence Images ====================
+        // Assign local_evidence to each defect
         $tempEvidenceFiles = [];
-        $tempEvidenceImages = $this->downloadEvidenceImagesInParallel($inspection);
-        
-        foreach ($tempEvidenceImages as $defectId => $localPaths) {
-            $defect = $inspection->defects()->find($defectId);
-            if ($defect) {
-                $defect->local_evidence = $localPaths;
+        foreach ($inspection->defects as $defect) {
+            if (isset($evidenceMap[$defect->id])) {
+                $defect->local_evidence = $evidenceMap[$defect->id];
+                $tempEvidenceFiles = array_merge($tempEvidenceFiles, $evidenceMap[$defect->id]);
+            } else {
+                $defect->local_evidence = [];
             }
-            // Track temp files for cleanup
-            $tempEvidenceFiles = array_merge($tempEvidenceFiles, $localPaths);
         }
 
         // ==================== SECTION 4: Generate PDF ====================
-        // $template = $inspection->template;
-        // $viewFile = $template ? $template->view_file : 'pdf_template_1';
-
-        // $pdf = Pdf::setOptions(['isRemoteEnabled' => true]);
-
-         $template = $inspection->template;
-        $viewFile = $template ? $template->view_file : 'pdf_template_1';
+        $template = $inspection->template;
+        $viewFile = $template ? $template->view_file : 'pdf_template_2';
 
         $pdf = Pdf::setOptions(['isRemoteEnabled' => true]);
-
-        if ($viewFile === 'pdf_template_2') {
-            $pdf->loadView('inspections.pdf_template_2', compact('inspection', 'indicatedPath', 'locationMaps'));
-        } else {
-            $pdf->loadView('inspections.pdf_template_1', compact('inspection', 'indicatedPath'));
-        }
+        $pdf->loadView('inspections.'.$viewFile, compact('inspection', 'indicatedPath', 'locationMaps', 'plainLayoutPath'));
         $pdf->setPaper('A4', 'portrait');
+
         $safeTitle = str_replace([' ', '/', '\\'], '_', $inspection->title);
         $response = $pdf->download('Laporan_Defect_'.$safeTitle.'.pdf');
 
-        // ==================== SECTION 5: Cleanup Temp Files ====================
-        $this->cleanupTempFiles($indicatedPath, $locationMaps, $inspection, $tempCoverImage, $tempEvidenceFiles);
+        // ==================== SECTION 5: Cleanup ====================
+        $this->cleanupTempFiles($indicatedPath, $locationMaps, $inspection, $tempCoverImage, $tempEvidenceFiles, $plainLayoutPath);
 
         $endTime = microtime(true);
-        $executionTime = round($endTime - $startTime, 2);
-        Log::info("PDF Generation Time (Inspection ID: {$id}): {$executionTime} seconds.");
+        Log::info("PDF Generation Time: ".round($endTime - $startTime, 2)."s (ID: {$id})");
 
         return $response;
     }
 
     /**
-     * OPTIMIZED: Download evidence images in parallel using Guzzle promises
-     * Instead of sequential downloads, all S3 calls are made concurrently
-     * 
-     * @param Inspection $inspection
-     * @return array Array of defect_id => [local_file_paths]
+     * Parallel download of evidence images with compression
      */
-    protected function downloadEvidenceImagesInParallel(Inspection $inspection): array
+    protected function downloadEvidenceImagesParallel(Inspection $inspection): array
     {
         $tempEvidenceImages = [];
-        
-        // Build array of promises for parallel downloads
-        $promises = [];
-        $promiseMap = []; // Track which promise belongs to which defect/image
-        
-        $client = new Client();
         $s3Client = Storage::disk('s3')->getClient();
+        $promises = [];
 
         foreach ($inspection->defects as $defect) {
-            $localPaths = [];
-            
+            $tempEvidenceImages[$defect->id] = [];
             if (!empty($defect->img) && is_array($defect->img)) {
-                // Only process first 4 images (as per original logic)
-                $imagesToDownload = array_slice($defect->img, 0, 4);
-                
-                foreach ($imagesToDownload as $s3Path) {
+                $images = array_slice($defect->img, 0, 4);
+                foreach ($images as $s3Path) {
                     if (Storage::disk('s3')->exists($s3Path)) {
-                        // Create promise for this S3 file
                         $promise = $s3Client->getObjectAsync([
                             'Bucket' => config('filesystems.disks.s3.bucket'),
                             'Key'    => $s3Path,
                         ])->then(
-                            function ($result) use ($s3Path) {
-                                // Success: Save to temp file
-                                $tempFilename = storage_path('app/public/inspections/ev_'.uniqid().'.jpg');
-                                file_put_contents($tempFilename, (string) $result['Body']);
-                                return ['success' => true, 'path' => $tempFilename, 's3Path' => $s3Path];
+                            function ($result) use ($defect) {
+                                $tempFile = $this->compressAndSaveImage((string) $result['Body'], 65);
+                                if ($tempFile) {
+                                    return ['defect_id' => $defect->id, 'path' => $tempFile];
+                                }
+                                return null;
                             },
                             function ($reason) use ($s3Path) {
-                                // Failure: Log and return null
-                                Log::error("Failed to download evidence image {$s3Path}: ".$reason);
-                                return ['success' => false, 's3Path' => $s3Path];
+                                Log::error("S3 download failed: {$s3Path} - ".$reason);
+                                return null;
                             }
                         );
-                        
                         $promises[] = $promise;
-                        $promiseMap[] = ['defect_id' => $defect->id, 'index' => count($localPaths)];
                     }
                 }
             }
-            
-            $tempEvidenceImages[$defect->id] = $localPaths;
         }
 
-        // Execute all promises in parallel
         if (!empty($promises)) {
             try {
                 $results = Promise\Utils::settle($promises)->wait();
-                
-                $promiseIndex = 0;
                 foreach ($results as $result) {
-                    if ($result['state'] === 'fulfilled' && $result['value']['success']) {
-                        $defectId = $promiseMap[$promiseIndex]['defect_id'];
-                        $tempEvidenceImages[$defectId][] = $result['value']['path'];
+                    if ($result['state'] === 'fulfilled' && $result['value'] !== null) {
+                        $data = $result['value'];
+                        $tempEvidenceImages[$data['defect_id']][] = $data['path'];
                     }
-                    $promiseIndex++;
                 }
             } catch (\Exception $e) {
-                Log::error("Error during parallel S3 downloads: ".$e->getMessage());
-                // Fall back to sequential download
+                Log::error("Parallel download failed, falling back to sequential: ".$e->getMessage());
                 return $this->downloadEvidenceImagesSequential($inspection);
             }
         }
@@ -438,10 +429,7 @@ class InspectionController extends Controller
     }
 
     /**
-     * Fallback: Sequential download (slower but more reliable for troubleshooting)
-     * 
-     * @param Inspection $inspection
-     * @return array Array of defect_id => [local_file_paths]
+     * Sequential download of evidence images (fallback)
      */
     protected function downloadEvidenceImagesSequential(Inspection $inspection): array
     {
@@ -455,16 +443,17 @@ class InspectionController extends Controller
                     if (Storage::disk('s3')->exists($s3Path)) {
                         try {
                             $imgContent = Storage::disk('s3')->get($s3Path);
-                            $tempFilename = storage_path('app/public/inspections/ev_'.uniqid().'.jpg');
-                            file_put_contents($tempFilename, $imgContent);
-                            $localPaths[] = $tempFilename;
+                            $tempFile = $this->compressAndSaveImage($imgContent, 65);
+                            if ($tempFile) {
+                                $localPaths[] = $tempFile;
+                            }
                         } catch (\Exception $e) {
                             Log::error("Error downloading {$s3Path}: ".$e->getMessage());
                         }
                     }
                 }
             }
-            
+
             $tempEvidenceImages[$defect->id] = $localPaths;
         }
 
@@ -472,9 +461,29 @@ class InspectionController extends Controller
     }
 
     /**
+     * Compress an image and save as JPEG
+     */
+    protected function compressAndSaveImage($imageData, $quality = 65)
+    {
+        try {
+            $img = @imagecreatefromstring($imageData);
+            if (!$img) {
+                return null;
+            }
+            $tempFile = storage_path('app/public/inspections/img_'.uniqid().'.jpg');
+            imagejpeg($img, $tempFile, $quality);
+            imagedestroy($img);
+            return $tempFile;
+        } catch (\Exception $e) {
+            Log::error("Image compression failed: ".$e->getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Clean up temporary files after PDF generation
      */
-    protected function cleanupTempFiles($indicatedPath, $locationMaps, $inspection, $tempCoverImage, $tempEvidenceFiles): void
+    protected function cleanupTempFiles($indicatedPath, $locationMaps, $inspection, $tempCoverImage, $tempEvidenceFiles, $plainLayoutPath = null): void
     {
         if ($indicatedPath && file_exists($indicatedPath)) {
             @unlink($indicatedPath);
@@ -500,6 +509,10 @@ class InspectionController extends Controller
             if (file_exists($tempFile)) {
                 @unlink($tempFile);
             }
+        }
+
+        if ($plainLayoutPath && file_exists($plainLayoutPath)) {
+            @unlink($plainLayoutPath);
         }
     }
 
