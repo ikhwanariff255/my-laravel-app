@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Storage;
 
 class Inspection extends Model
 {
-    // Tambah 'user_id' di sini supaya Laravel benarkan ia disimpan
     protected $fillable = [
         'user_id',
         'title',
@@ -39,23 +38,19 @@ class Inspection extends Model
 
     protected $appends = ['image_url', 'layout_url'];
 
-    // Generate secure URL for the main image
+    // Generate local public URL for the main image
     public function getImageUrlAttribute()
     {
         if (!$this->img) return null;
         
-        return Storage::disk('s3')->temporaryUrl(
-            $this->img, now()->addMinutes(60)
-        );
+        return Storage::disk('public')->url($this->img);
     }
 
-    // Generate secure URL for the layout image
+    // Generate local public URL for the layout image
     public function getLayoutUrlAttribute()
     {
         if (!$this->layout_img) return null;
         
-        return Storage::disk('s3')->temporaryUrl(
-            $this->layout_img, now()->addMinutes(60)
-        );
+        return Storage::disk('public')->url($this->layout_img);
     }
 }

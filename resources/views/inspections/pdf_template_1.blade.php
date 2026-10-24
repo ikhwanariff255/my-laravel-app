@@ -170,28 +170,40 @@
 
     <div class="page-break"></div>
 
-    <!-- ================= 2. TABLE OF CONTENTS ================= -->
+   <!-- ================= 2. TABLE OF CONTENTS ================= -->
     @php
         $groupedDefects = $inspection->defects->groupBy(function($item) {
             return !empty($item->location) ? strtoupper(trim($item->location)) : 'UNSPECIFIED LOCATION';
         });
         
-        $estPage = 5; 
+        // Mula selepas Muka Depan (1), Contents (2), Floor Plan (3), Indication Plan (4)
+        $currentPage = 5; 
+        $pageMapping = [];
+
+        foreach($groupedDefects as $location => $defects) {
+            // Tetapkan muka surat semasa untuk lokasi ini
+            $pageMapping[$location] = $currentPage;
+            
+            // Kira jumlah muka surat yang digunakan oleh lokasi ini
+            // 2 defect memakan 1 muka surat (Tajuk lokasi muat sekali di halaman pertama)
+            $totalDefects = $defects->count();
+            $pagesUsed = ceil($totalDefects / 2); 
+            
+            // Tambah muka surat yang digunakan untuk lokasi seterusnya
+            $currentPage += $pagesUsed;
+        }
     @endphp
 
     <div class="toc-title">Contents</div>
     <table class="toc-table">
-        @foreach($groupedDefects as $location => $defects)
+        @foreach($pageMapping as $location => $pageNo)
             <tr>
                 <td style="padding: 8px 0; white-space: nowrap;">Location: {{ $location }}</td>
                 <td style="padding: 8px 10px; width: 99%; vertical-align: middle;">
                     <div style="border-bottom: 1.5px dotted #a0aec0; width: 100%; height: 1px;"></div>
                 </td>
-                <td style="padding: 8px 0; text-align: right; white-space: nowrap;">{{ $estPage }}</td>
+                <td style="padding: 8px 0; text-align: right; white-space: nowrap;">{{ $pageNo }}</td>
             </tr>
-            @php 
-                $estPage += ceil($defects->count() / 1.5); 
-            @endphp
         @endforeach
     </table>
 

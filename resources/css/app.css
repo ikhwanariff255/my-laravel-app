@@ -116,4 +116,32 @@
     .badge-yellow {
         @apply badge bg-yellow-100 text-yellow-800;
     }
+
+    /* Letakkan dalam fail resources/css/app.css anda */
+.dark body {
+    background-color: #020617; /* Slate-950 */
+    color: #f1f5f9;
+}
+
+/* Paksa semua kad putih / kotak table jadi gelap automatik bila mode dark */
+.dark .bg-white,
+.dark table,
+.dark .table-container {
+    background-color: #0f172a !important; /* Slate-900 */
+    color: #f1f5f9 !important;
+    border-color: #1e293b !important; /* Slate-800 */
+}
+
+/* Paksa baris dalam table atau border jadi gelap */
+.dark tr, .dark td, .dark th {
+    border-color: #1e293b !important;
+    color: #e2e8f0 !important;
+}
+
+/* Paksa input carian / dropdown jadi gelap */
+.dark input, .dark select, .dark textarea {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+    border-color: #334155 !important;
+}
 }

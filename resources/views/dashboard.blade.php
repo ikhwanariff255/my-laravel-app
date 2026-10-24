@@ -8,15 +8,16 @@
         <p class="text-gray-500 text-sm mt-1">Welcome back, {{ Auth::user()->name }}! Here is your business summary.</p>
     </div>
 
-    <!-- Metric Cards Grid (Sales, Total Inspections, Invoices) -->
+    <!-- Metric Cards Grid -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <!-- Current Month Sales -->
+        
+        @if(Auth::user()->role === 'owner')
+        <!-- Current Month Sales (Hanya Owner nampak) -->
         <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center justify-between">
             <div>
                 <p class="text-sm font-semibold text-gray-400 uppercase tracking-wider">This Month Sales</p>
                 <h3 class="text-2xl font-black text-gray-800 mt-1">RM {{ number_format($currentMonthSales, 2) }}</h3>
                 
-                <!-- Revenue Growth badge -->
                 <div class="flex items-center mt-2 text-xs font-bold">
                     @if($growthPercentage >= 0)
                         <span class="text-green-600 bg-green-50 px-2 py-0.5 rounded-full flex items-center">
@@ -34,6 +35,7 @@
                 <i class="fas fa-dollar-sign"></i>
             </div>
         </div>
+        @endif
 
         <!-- Total Inspections -->
         <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center justify-between">
@@ -47,7 +49,8 @@
             </div>
         </div>
 
-        <!-- Total Invoices -->
+        @if(Auth::user()->role === 'owner')
+        <!-- Total Invoices (Hanya Owner nampak) -->
         <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center justify-between">
             <div>
                 <p class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Total Invoices Issued</p>
@@ -58,11 +61,13 @@
                 <i class="fas fa-file-invoice"></i>
             </div>
         </div>
+        @endif
     </div>
 
-    <!-- Charts Grid (Sales Trend & Property Distribution) -->
+    <!-- Charts Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <!-- Sales Trend Bar Chart (Takes 2 columns) -->
+        @if(Auth::user()->role === 'owner')
+        <!-- Sales Trend Bar Chart (Hanya Owner nampak) -->
         <div class="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="font-bold text-gray-800"><i class="fas fa-chart-bar text-blue-500 mr-2"></i> Monthly Sales Trend (6 Months)</h3>
@@ -71,9 +76,10 @@
                 <canvas id="dashboardSalesChart"></canvas>
             </div>
         </div>
+        @endif
 
-        <!-- Property Distribution Doughnut Chart (Takes 1 column) -->
-        <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <!-- Property Distribution Doughnut Chart -->
+        <div class="{{ Auth::user()->role === 'owner' ? '' : 'lg:col-span-3' }} bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="font-bold text-gray-800"><i class="fas fa-home text-purple-500 mr-2"></i> Property Types</h3>
             </div>
@@ -82,6 +88,8 @@
             </div>
         </div>
     </div>
+    
+    <!-- (Bahagian bawah kekal seperti biasa...) -->
 
     <!-- Quick Actions (Start New Project & View List) -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">

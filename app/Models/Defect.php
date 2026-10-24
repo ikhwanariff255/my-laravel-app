@@ -40,11 +40,9 @@ class Defect extends Model
 
         if (!is_array($paths)) return [];
 
-        // Generate a presigned URL for every image in the array
+        // Generate public URL for every image in the array
         return array_map(function ($path) {
-            return Storage::disk('s3')->temporaryUrl(
-                $path, now()->addMinutes(60)
-            );
+            return Storage::disk('public')->url($path);
         }, $paths);
     }
 }

@@ -21,8 +21,8 @@ class DefectController extends Controller
 
         if ($request->hasFile('images')) {
             foreach ($request->file('images') as $file) {
-                // Changed 'public' to 's3'
-                $imagePaths[] = $file->store('defects', 's3');
+                // Simpan ke disk public tempatan
+                $imagePaths[] = $file->store('defects', 'public');
             }
         }
 
@@ -66,21 +66,19 @@ class DefectController extends Controller
 
         // Kalau ada gambar baru di-upload, kita gantikan yang lama
         if ($request->hasFile('images')) {
-            // Padam gambar lama dari AWS S3
+            // Padam gambar lama dari Storage tempatan
             if (is_array($defect->img)) {
                 foreach ($defect->img as $oldImage) {
-                    // Changed 'public' to 's3'
-                    if (Storage::disk('s3')->exists($oldImage)) {
-                        Storage::disk('s3')->delete($oldImage);
+                    if (Storage::disk('public')->exists($oldImage)) {
+                        Storage::disk('public')->delete($oldImage);
                     }
                 }
             }
 
-            // Masukkan gambar baru ke S3
+            // Masukkan gambar baru ke disk public tempatan
             $imagePaths = [];
             foreach ($request->file('images') as $file) {
-                // Changed 'public' to 's3'
-                $imagePaths[] = $file->store('defects', 's3');
+                $imagePaths[] = $file->store('defects', 'public');
             }
             $defect->img = $imagePaths;
         }
@@ -93,12 +91,11 @@ class DefectController extends Controller
     // Proses Delete Data
     public function destroy(Defect $defect)
     {
-        // Padam gambar dari AWS S3 sebelum delete rekod
+        // Padam gambar dari Storage tempatan sebelum delete rekod
         if (is_array($defect->img)) {
             foreach ($defect->img as $image) {
-                // Changed 'public' to 's3'
-                if (Storage::disk('s3')->exists($image)) {
-                    Storage::disk('s3')->delete($image);
+                if (Storage::disk('public')->exists($image)) {
+                    Storage::disk('public')->delete($image);
                 }
             }
         }

@@ -8,6 +8,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -21,9 +22,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 // Halaman Utama (Welcome)
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', [AuthenticatedSessionController::class, 'create'])->name('login');
 
 // Dashboard Utama Projek Anda (Ganti view asal Breeze dengan Controller anda)
 Route::get('/dashboard', [DashboardController::class, 'index'])

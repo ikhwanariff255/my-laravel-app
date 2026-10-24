@@ -51,8 +51,7 @@ class InspectionController extends Controller
             $imageDecoded = base64_decode($base64Image);
             if ($imageDecoded !== false) {
                 $filename = 'home_'.time().'_'.Str::random(5).'.jpg';
-                // Save directly to S3
-                Storage::disk('s3')->put('inspections/'.$filename, $imageDecoded);
+                Storage::disk('public')->put('inspections/'.$filename, $imageDecoded);
                 $imgPath = 'inspections/'.$filename;
             }
         }
@@ -65,8 +64,7 @@ class InspectionController extends Controller
             $layoutDecoded = base64_decode($base64Layout);
             if ($layoutDecoded !== false) {
                 $filename = 'layout_'.time().'_'.Str::random(5).'.jpg';
-                // Save directly to S3
-                Storage::disk('s3')->put('inspections/'.$filename, $layoutDecoded);
+                Storage::disk('public')->put('inspections/'.$filename, $layoutDecoded);
                 $layoutPath = 'inspections/'.$filename;
             }
         }
@@ -131,12 +129,11 @@ class InspectionController extends Controller
             }
             $imageDecoded = base64_decode($base64Image);
             if ($imageDecoded !== false) {
-                // Delete old from S3
-                if ($inspection->img && Storage::disk('s3')->exists($inspection->img)) {
-                    Storage::disk('s3')->delete($inspection->img);
+                if ($inspection->img && Storage::disk('public')->exists($inspection->img)) {
+                    Storage::disk('public')->delete($inspection->img);
                 }
                 $filename = 'home_'.time().'_'.Str::random(5).'.jpg';
-                Storage::disk('s3')->put('inspections/'.$filename, $imageDecoded);
+                Storage::disk('public')->put('inspections/'.$filename, $imageDecoded);
                 $imgPath = 'inspections/'.$filename;
             }
         }
@@ -148,12 +145,11 @@ class InspectionController extends Controller
             }
             $layoutDecoded = base64_decode($base64Layout);
             if ($layoutDecoded !== false) {
-                // Delete old from S3
-                if ($inspection->layout_img && Storage::disk('s3')->exists($inspection->layout_img)) {
-                    Storage::disk('s3')->delete($inspection->layout_img);
+                if ($inspection->layout_img && Storage::disk('public')->exists($inspection->layout_img)) {
+                    Storage::disk('public')->delete($inspection->layout_img);
                 }
                 $filename = 'layout_'.time().'_'.Str::random(5).'.jpg';
-                Storage::disk('s3')->put('inspections/'.$filename, $layoutDecoded);
+                Storage::disk('public')->put('inspections/'.$filename, $layoutDecoded);
                 $layoutPath = 'inspections/'.$filename;
             }
         }
@@ -178,10 +174,11 @@ class InspectionController extends Controller
 
     public function downloadPDF($id, $template_type)
     {
-        // 1. Start the timer
         $startTime = microtime(true);
 
+        ports:
         ini_set('memory_limit', '512M');
+        pdo_timeout:
         ini_set('max_execution_time', 300);
 
         $inspection = Inspection::with('defects', 'user')->findOrFail($id);
@@ -191,8 +188,8 @@ class InspectionController extends Controller
         $locationMaps = [];
         $imgData = null;
 
-        if ($inspection->layout_img && Storage::disk('s3')->exists($inspection->layout_img)) {
-            $imgData = Storage::disk('s3')->get($inspection->layout_img);
+        if ($inspection->layout_img && Storage::disk('public')->exists($inspection->layout_img)) {
+            $imgData = Storage::disk('public')->get($inspection->layout_img);
         }
 
         Storage::disk('public')->makeDirectory('inspections');
@@ -281,23 +278,21 @@ class InspectionController extends Controller
         $tempEvidenceFiles = [];
         $tempCoverImage = null;
 
-        // Pre-download Cover Image
-        if ($inspection->img && Storage::disk('s3')->exists($inspection->img)) {
-            $coverData = Storage::disk('s3')->get($inspection->img);
+        if ($inspection->img && Storage::disk('public')->exists($inspection->img)) {
+            $coverData = Storage::disk('public')->get($inspection->img);
             $tempCoverImage = storage_path('app/public/inspections/cover_'.time().'.jpg');
             file_put_contents($tempCoverImage, $coverData);
 
             $inspection->local_cover = $tempCoverImage;
         }
 
-        // Pre-download Defect Evidence Images
         foreach ($inspection->defects as $defect) {
             $localEvidencePaths = [];
 
             if (! empty($defect->img) && is_array($defect->img)) {
-                foreach (array_slice($defect->img, 0, 4) as $s3Path) {
-                    if (Storage::disk('s3')->exists($s3Path)) {
-                        $imgContent = Storage::disk('s3')->get($s3Path);
+                foreach (array_slice($defect->img, 0, 4) as $path) {
+                    if (Storage::disk('public')->exists($path)) {
+                        $imgContent = Storage::disk('public')->get($path);
                         $tempFilename = storage_path('app/public/inspections/ev_'.uniqid().'.jpg');
                         file_put_contents($tempFilename, $imgContent);
 
@@ -321,7 +316,6 @@ class InspectionController extends Controller
         $safeTitle = str_replace([' ', '/', '\\'], '_', $inspection->title);
         $response = $pdf->download('Laporan_Defect_'.$safeTitle.'.pdf');
 
-        // Cleanup Absolute Paths
         if ($indicatedPath && file_exists($indicatedPath)) {
             @unlink($indicatedPath);
         }
@@ -345,7 +339,6 @@ class InspectionController extends Controller
             }
         }
 
-        // 2. Stop the timer, calculate duration, and log it
         $endTime = microtime(true);
         $executionTime = round($endTime - $startTime, 2);
 
@@ -378,13 +371,12 @@ class InspectionController extends Controller
 
     public function destroy(Inspection $inspection)
     {
-        // Delete from S3
-        if ($inspection->img && Storage::disk('s3')->exists($inspection->img)) {
-            Storage::disk('s3')->delete($inspection->img);
+        if ($inspection->img && Storage::disk('public')->exists($inspection->img)) {
+            Storage::disk('public')->delete($inspection->img);
         }
 
-        if ($inspection->layout_img && Storage::disk('s3')->exists($inspection->layout_img)) {
-            Storage::disk('s3')->delete($inspection->layout_img);
+        if ($inspection->layout_img && Storage::disk('public')->exists($inspection->layout_img)) {
+            Storage::disk('public')->delete($inspection->layout_img);
         }
 
         $inspection->staffs()->detach();
