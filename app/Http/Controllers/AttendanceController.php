@@ -4,8 +4,13 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Attendance;
+use App\Models\CompanySetting;
+use App\Models\Leave;
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
+use Carbon\CarbonPeriod;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class AttendanceController extends Controller
 {
@@ -26,7 +31,9 @@ class AttendanceController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 
-        return view('attendance.index', compact('todayAttendance', 'attendances', 'user'));
+        $officeHours = CompanySetting::officeHours();
+
+        return view('attendance.index', compact('todayAttendance', 'attendances', 'user', 'officeHours'));
     }
 
     public function clockIn(Request $request)
@@ -70,18 +77,21 @@ class AttendanceController extends Controller
             ], 400);
         }
 
+        $isLate = Attendance::isLateAt(now());
+
         Attendance::create([
             'user_id' => $user->id,
             'clock_in' => now(),
             'clock_in_latitude' => $request->latitude,
             'clock_in_longitude' => $request->longitude,
             'distance_meters' => $distance,
-            'status' => now()->format('H:i') > config('attendance.late_after') ? 'late' : 'present',
+            'status' => $isLate ? 'late' : 'present',
         ]);
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Clock-in successful! Distance: ' . round($distance) . ' meters.'
+            'message' => ($isLate ? 'Clock-in recorded as LATE (late after ' . Attendance::lateCutoff()->format('H:i') . ').' : 'Clock-in successful!')
+                . ' Distance: ' . round($distance) . ' meters.'
         ]);
     }
 
@@ -116,15 +126,26 @@ class AttendanceController extends Controller
             ], 400);
         }
 
+        $isEarly = Attendance::isEarlyOutAt(now());
+
+        // Before office end time the user must confirm; it is then flagged as an early clock-out
+        if ($isEarly && !$request->boolean('confirm_early')) {
+            return response()->json([
+                'status' => 'confirm',
+                'message' => 'Office hours end at ' . CompanySetting::officeHours()['end'] . '. Clocking out now will be recorded as an EARLY CLOCK-OUT. Continue?'
+            ], 409);
+        }
+
         $attendance->update([
             'clock_out' => now(),
+            'early_out' => $isEarly,
             'clock_out_latitude' => $request->latitude,
             'clock_out_longitude' => $request->longitude,
         ]);
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Clock-out successful!'
+            'message' => $isEarly ? 'Clock-out recorded as EARLY CLOCK-OUT.' : 'Clock-out successful!'
         ]);
     }
 
@@ -146,22 +167,155 @@ class AttendanceController extends Controller
         return $angle * $earthRadius;
     }
 
+    // The report now lives inside the monthly dashboard; keep old links working
     public function report(Request $request)
     {
-        // Attendance report is for the Owner only
+        $date = $request->filled('date') ? rescue(fn () => Carbon::parse($request->input('date')), null, false) : null;
+
+        return redirect()->route('attendance.monthly', array_filter([
+            'month' => $date?->format('Y-m'),
+            'date' => $date?->toDateString(),
+        ]));
+    }
+
+    public function monthly(Request $request)
+    {
+        // Monthly attendance dashboard is for the Owner only
         if (Auth::user()->role !== 'owner') {
-            abort(403, 'Access denied. The attendance report is for the Owner only.');
+            abort(403, 'Access denied. The attendance dashboard is for the Owner only.');
         }
 
-        $query = Attendance::with('user')->orderBy('created_at', 'desc');
+        $month = rescue(
+            fn () => Carbon::createFromFormat('Y-m', (string) $request->input('month'))->startOfMonth(),
+            now()->startOfMonth(),
+            false
+        );
+        $monthEnd = $month->copy()->endOfMonth();
+        $today = Carbon::today();
+        $workDays = config('attendance.work_days');
 
-        // Filter by date if provided
-        if ($request->filled('date')) {
-            $query->whereDate('created_at', $request->date);
+        $staff = User::whereIn('role', ['admin_office', 'staff'])->orderBy('name')->get();
+
+        $attendances = Attendance::whereIn('user_id', $staff->pluck('id'))
+            ->whereBetween('created_at', [$month, $monthEnd])
+            ->get()
+            ->groupBy('user_id')
+            ->map(fn ($rows) => $rows->keyBy(fn ($a) => $a->created_at->toDateString()));
+
+        $leaves = Leave::whereIn('user_id', $staff->pluck('id'))
+            ->where('status', 'approved')
+            ->whereDate('start_date', '<=', $monthEnd)
+            ->whereDate('end_date', '>=', $month)
+            ->get()
+            ->groupBy('user_id');
+
+        $days = collect(CarbonPeriod::create($month, $monthEnd))->map(fn ($d) => [
+            'date' => $d->copy(),
+            'workday' => in_array($d->dayOfWeekIso, $workDays),
+            'future' => $d->gt($today),
+        ]);
+
+        $rows = $staff->map(function ($user) use ($days, $attendances, $leaves, $today) {
+            $userAttendance = $attendances->get($user->id, collect());
+            $userLeaves = $leaves->get($user->id, collect());
+            $stats = ['present' => 0, 'late' => 0, 'early_out' => 0, 'leave' => 0, 'absent' => 0];
+            $cells = [];
+
+            foreach ($days as $d) {
+                $key = $d['date']->toDateString();
+                $label = $d['date']->format('D, d M');
+                $record = $userAttendance->get($key);
+                $onLeave = $userLeaves->first(fn ($l) => $d['date']->between($l->start_date, $l->end_date));
+
+                if ($record) {
+                    $isLate = $record->status === 'late';
+                    $stats['present']++;
+                    $stats['late'] += $isLate ? 1 : 0;
+                    $stats['early_out'] += $record->early_out ? 1 : 0;
+                    $type = $isLate && $record->early_out ? 'late_early' : ($isLate ? 'late' : ($record->early_out ? 'early' : 'on_time'));
+                    $cells[] = ['type' => $type, 'title' => $label . ' — In ' . $record->clock_in->format('H:i') . ', Out ' . ($record->clock_out?->format('H:i') ?? '—')];
+                } elseif (!$d['workday']) {
+                    $cells[] = ['type' => 'off', 'title' => $label . ' — Off day'];
+                } elseif ($onLeave) {
+                    $stats['leave']++;
+                    $cells[] = ['type' => 'leave', 'title' => $label . ' — On leave (' . ucfirst($onLeave->leave_type) . ')'];
+                } elseif ($d['future'] || $d['date']->lt($user->created_at->copy()->startOfDay())) {
+                    $cells[] = ['type' => 'none', 'title' => $label];
+                } elseif ($d['date']->isSameDay($today)) {
+                    $cells[] = ['type' => 'pending', 'title' => $label . ' — Not clocked in yet'];
+                } else {
+                    $stats['absent']++;
+                    $cells[] = ['type' => 'absent', 'title' => $label . ' — Absent'];
+                }
+            }
+
+            return [
+                'user' => $user,
+                'cells' => $cells,
+                'stats' => $stats,
+                'punctuality' => $stats['present'] ? (int) round(($stats['present'] - $stats['late']) / $stats['present'] * 100) : null,
+            ];
+        });
+
+        $totals = [];
+        foreach (['present', 'late', 'early_out', 'leave', 'absent'] as $key) {
+            $totals[$key] = $rows->sum("stats.$key");
+        }
+        $expected = $totals['present'] + $totals['absent'];
+        $totals['attendance_rate'] = $expected ? (int) round($totals['present'] / $expected * 100) : null;
+        $totals['on_time_rate'] = $totals['present'] ? (int) round(($totals['present'] - $totals['late']) / $totals['present'] * 100) : null;
+        // Map & staff table are paginated; the totals still cover everyone
+        $perPage = 15;
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $pageRows = new LengthAwarePaginator(
+            $rows->forPage($page, $perPage)->values(),
+            $rows->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->only('month', 'user', 'date')]
+        );
+
+        // Attendance records for the month, optionally filtered by staff and/or date
+        $selectedUser = $staff->firstWhere('id', (int) $request->input('user'));
+        $selectedDate = $request->filled('date') ? rescue(fn () => Carbon::parse($request->input('date')), null, false) : null;
+        if ($selectedDate && !$selectedDate->isSameMonth($month)) {
+            $selectedDate = null;
         }
 
-        $attendances = $query->paginate(20)->withQueryString();
+        $records = Attendance::with('user')
+            ->whereIn('user_id', $staff->pluck('id'))
+            ->whereBetween('created_at', [$month, $monthEnd])
+            ->when($selectedUser, fn ($q) => $q->where('user_id', $selectedUser->id))
+            ->when($selectedDate, fn ($q) => $q->whereDate('created_at', $selectedDate))
+            ->orderBy('created_at', 'desc')
+            ->paginate(20, ['*'], 'records_page')
+            ->withQueryString()
+            ->fragment('records');
 
-        return view('attendance.report', compact('attendances'));
+        $officeHours = CompanySetting::officeHours();
+
+        return view('attendance.monthly', compact('month', 'staff', 'rows', 'days', 'pageRows', 'totals', 'records', 'selectedUser', 'selectedDate', 'officeHours'));
+    }
+
+    public function updateOfficeHours(Request $request)
+    {
+        if (Auth::user()->role !== 'owner') {
+            abort(403, 'Access denied. Only the Owner can change office hours.');
+        }
+
+        $validated = $request->validate([
+            'office_start_time' => 'required|date_format:H:i',
+            'office_grace_minutes' => 'required|integer|min:0|max:120',
+            'office_end_time' => 'required|date_format:H:i|after:office_start_time',
+        ], [
+            'office_end_time.after' => 'End time must be after the start time.',
+        ]);
+
+        $settings = CompanySetting::first() ?? new CompanySetting();
+        $settings->fill($validated)->save();
+
+        return redirect()
+            ->route('attendance.monthly', $request->only('month'))
+            ->with('success', 'Office hours updated. New times apply to clock-ins and clock-outs from now on.');
     }
 }

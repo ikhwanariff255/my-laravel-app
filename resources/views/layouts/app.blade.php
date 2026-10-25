@@ -111,11 +111,11 @@
                         <span>Leave Approvals</span>
                     </a>
 
-                    <!-- Attendance Report (Exclusive to Owner) -->
+                    <!-- Attendance Dashboard incl. records (Exclusive to Owner) -->
                     @if(Auth::user()->role == 'owner')
-                    <a href="{{ route('attendance.report') }}" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg {{ request()->routeIs('attendance.report') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }} transition-colors">
-                        <i class="fa-solid fa-clipboard-user w-6"></i>
-                        <span>Attendance Report</span>
+                    <a href="{{ route('attendance.monthly') }}" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg {{ request()->routeIs('attendance.monthly') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }} transition-colors">
+                        <i class="fa-solid fa-calendar-days w-6"></i>
+                        <span>Attendance Dashboard</span>
                     </a>
                     @endif
                 </div>

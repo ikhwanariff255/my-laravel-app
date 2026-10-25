@@ -95,6 +95,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/attendance/clock-in', [AttendanceController::class, 'clockIn'])->name('attendance.clockIn');
     Route::post('/attendance/clock-out', [AttendanceController::class, 'clockOut'])->name('attendance.clockOut');
     Route::get('/attendance/report', [AttendanceController::class, 'report'])->name('attendance.report');
+    Route::get('/attendance/monthly', [AttendanceController::class, 'monthly'])->name('attendance.monthly');
+    Route::patch('/attendance/office-hours', [AttendanceController::class, 'updateOfficeHours'])->name('attendance.officeHours');
 
     // ================= LEAVES =================
     // Own leave applications

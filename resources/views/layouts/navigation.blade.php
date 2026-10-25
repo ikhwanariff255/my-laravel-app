@@ -26,8 +26,8 @@
 
                     {{-- Attendance Report menu (Owner only) --}}
                     @if(Auth::user()->role === 'owner')
-                        <x-nav-link :href="route('attendance.report')" :active="request()->routeIs('attendance.report')" class="text-white hover:bg-blue-700">
-                            {{ __('Attendance Report') }}
+                        <x-nav-link :href="route('attendance.monthly')" :active="request()->routeIs('attendance.monthly')" class="text-white hover:bg-blue-700">
+                            {{ __('Attendance Dashboard') }}
                         </x-nav-link>
                     @endif
                 </div>
@@ -95,8 +95,8 @@
 
             {{-- Mobile Attendance Report menu (Owner only) --}}
             @if(Auth::user()->role === 'owner')
-                <x-responsive-nav-link :href="route('attendance.report')" :active="request()->routeIs('attendance.report')">
-                    {{ __('Attendance Report') }}
+                <x-responsive-nav-link :href="route('attendance.monthly')" :active="request()->routeIs('attendance.monthly')">
+                    {{ __('Attendance Dashboard') }}
                 </x-responsive-nav-link>
             @endif
         </div>
