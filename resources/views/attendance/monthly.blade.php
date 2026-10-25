@@ -128,7 +128,7 @@
 
     @if ($rows->isEmpty())
         <div class="bg-white rounded-2xl p-10 shadow-sm border border-gray-100 text-center text-gray-500">
-            No staff who clock in (Admin Office / Staff) yet.
+            No Admin Office users yet. Attendance applies to the Admin Office role only.
         </div>
     @else
 

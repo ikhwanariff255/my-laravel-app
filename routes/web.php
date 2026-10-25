@@ -99,9 +99,11 @@ Route::middleware('auth')->group(function () {
     Route::patch('/attendance/office-hours', [AttendanceController::class, 'updateOfficeHours'])->name('attendance.officeHours');
 
     // ================= LEAVES =================
-    // Own leave applications
-    Route::get('/leaves', [LeaveController::class, 'index'])->name('leaves.index');
-    Route::post('/leaves', [LeaveController::class, 'store'])->name('leaves.store');
+    // Own leave applications (Owner & Admin Office; not staff)
+    Route::middleware('can:apply-leave')->group(function () {
+        Route::get('/leaves', [LeaveController::class, 'index'])->name('leaves.index');
+        Route::post('/leaves', [LeaveController::class, 'store'])->name('leaves.store');
+    });
     Route::get('/leaves/{leave}/attachment', [LeaveController::class, 'attachment'])->name('leaves.attachment');
 
     // Leave management & approvals (Owner & Admin Office)

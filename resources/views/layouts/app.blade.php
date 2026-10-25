@@ -63,11 +63,13 @@
                 </a>
                 @endif
 
-                <!-- My Leaves / Apply Leave -->
+                <!-- My Leaves / Apply Leave (not for staff) -->
+                @can('apply-leave')
                 <a href="{{ route('leaves.index') }}" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg {{ request()->routeIs('leaves.index') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }} transition-colors">
                     <i class="fa-solid fa-calendar-minus w-6"></i>
                     <span>My Leaves</span>
                 </a>
+                @endcan
 
                 <!-- ================= FINANCIALS SECTION ================= -->
                 @if(Auth::user()->canManageSystem())

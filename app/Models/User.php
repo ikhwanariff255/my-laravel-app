@@ -63,8 +63,15 @@ class User extends Authenticatable
         return in_array($this->role, ['owner', 'admin_office']);
     }
 
+    // Attendance (clock in/out) applies to Admin Office only
     public function canClockIn(): bool
     {
-        return in_array($this->role, ['admin_office', 'staff']);
+        return $this->role === 'admin_office';
+    }
+
+    // Staff do not use the leave module
+    public function canApplyLeave(): bool
+    {
+        return in_array($this->role, ['owner', 'admin_office']);
     }
 }

@@ -194,7 +194,8 @@ class AttendanceController extends Controller
         $today = Carbon::today();
         $workDays = config('attendance.work_days');
 
-        $staff = User::whereIn('role', ['admin_office', 'staff'])->orderBy('name')->get();
+        // Only Admin Office clock in; other roles' old records stay hidden and are never counted absent
+        $staff = User::where('role', 'admin_office')->orderBy('name')->get();
 
         $attendances = Attendance::whereIn('user_id', $staff->pluck('id'))
             ->whereBetween('created_at', [$month, $monthEnd])

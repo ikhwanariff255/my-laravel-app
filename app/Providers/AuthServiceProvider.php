@@ -24,5 +24,8 @@ class AuthServiceProvider extends ServiceProvider
     {
         // Owner & Admin Office: user management, financials, leave approvals
         Gate::define('manage-system', fn (User $user) => $user->canManageSystem());
+
+        // Owner & Admin Office: apply for leave (staff excluded)
+        Gate::define('apply-leave', fn (User $user) => $user->canApplyLeave());
     }
 }
