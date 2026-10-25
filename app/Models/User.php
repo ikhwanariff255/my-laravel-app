@@ -57,4 +57,14 @@ class User extends Authenticatable
     {
         return $this->hasMany(Invoice::class);
     }
+
+    public function canManageSystem(): bool
+    {
+        return in_array($this->role, ['owner', 'admin_office']);
+    }
+
+    public function canClockIn(): bool
+    {
+        return in_array($this->role, ['admin_office', 'staff']);
+    }
 }

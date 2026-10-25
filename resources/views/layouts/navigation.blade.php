@@ -16,6 +16,20 @@
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')" class="text-white hover:bg-blue-700">
                         {{ __('Dashboard') }}
                     </x-nav-link>
+
+                    {{-- Clock-In menu for Admin Office & Staff --}}
+                    @if(Auth::user()->canClockIn())
+                        <x-nav-link :href="route('attendance.index')" :active="request()->routeIs('attendance.*')" class="text-white hover:bg-blue-700">
+                            {{ __('My Attendance') }}
+                        </x-nav-link>
+                    @endif
+
+                    {{-- Attendance Report menu (Owner only) --}}
+                    @if(Auth::user()->role === 'owner')
+                        <x-nav-link :href="route('attendance.report')" :active="request()->routeIs('attendance.report')" class="text-white hover:bg-blue-700">
+                            {{ __('Attendance Report') }}
+                        </x-nav-link>
+                    @endif
                 </div>
             </div>
 
@@ -65,12 +79,26 @@
         </div>
     </div>
 
-    <!-- Responsive Navigation Menu -->
+    <!-- Responsive Navigation Menu (Mobile) -->
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
+
+            {{-- Mobile Clock-In menu for Admin Office & Staff --}}
+            @if(Auth::user()->canClockIn())
+                <x-responsive-nav-link :href="route('attendance.index')" :active="request()->routeIs('attendance.*')">
+                    {{ __('My Attendance') }}
+                </x-responsive-nav-link>
+            @endif
+
+            {{-- Mobile Attendance Report menu (Owner only) --}}
+            @if(Auth::user()->role === 'owner')
+                <x-responsive-nav-link :href="route('attendance.report')" :active="request()->routeIs('attendance.report')">
+                    {{ __('Attendance Report') }}
+                </x-responsive-nav-link>
+            @endif
         </div>
 
         <!-- Responsive Settings Options -->

@@ -1,14 +1,16 @@
 <?php
 
+use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\CashFlowController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InspectionController;
 use App\Http\Controllers\InvoiceController; // Ditambah untuk Modul Invoice
+use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Auth\AuthenticatedSessionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -32,7 +34,7 @@ Route::get('/dashboard', [DashboardController::class, 'index'])
 // Kumpulan Laluan yang Dilindungi Middleware 'auth'
 Route::middleware('auth')->group(function () {
 
-    Route::resource('users', UserController::class);
+    Route::resource('users', UserController::class)->middleware('can:manage-system');
     // Modul Profile (Bawaan Breeze)
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -67,25 +69,44 @@ Route::middleware('auth')->group(function () {
     // ==========================================
     // Modul Invoice & Cash Flow
     // ==========================================
-    Route::get('/invoice', [InvoiceController::class, 'index'])->name('invoice.index');
-    Route::get('/invoice/create', [InvoiceController::class, 'create'])->name('invoice.create');
-    Route::post('/invoice', [InvoiceController::class, 'store'])->name('invoice.store');
-    
-    // Route Download PDF Invoice
-    Route::get('/invoice/{id}/pdf', [InvoiceController::class, 'downloadPDF'])->name('invoice.pdf');
+    Route::middleware('can:manage-system')->group(function () {
+        Route::get('/invoice', [InvoiceController::class, 'index'])->name('invoice.index');
+        Route::get('/invoice/create', [InvoiceController::class, 'create'])->name('invoice.create');
+        Route::post('/invoice', [InvoiceController::class, 'store'])->name('invoice.store');
 
-    // ==========================================
-    // Modul Cash Flow
-    // ==========================================
-    Route::get('/cashflow', [CashFlowController::class, 'index'])->name('cashflow.index');
-    Route::get('/cashflow/create', [CashFlowController::class, 'create'])->name('cashflow.create');
-    Route::post('/cashflow', [CashFlowController::class, 'store'])->name('cashflow.store');
-    Route::get('/cashflow/{id}/pdf', [CashFlowController::class, 'downloadPDF'])->name('cashflow.pdf');
-    // Route untuk Laporan Cash Flow Bulanan (Format T-Account PDF)
-    Route::get('/cashflow/report-pdf', [CashFlowController::class, 'monthlyReportPDF'])->name('cashflow.report_pdf');
+        // Route Download PDF Invoice
+        Route::get('/invoice/{id}/pdf', [InvoiceController::class, 'downloadPDF'])->name('invoice.pdf');
 
+        // ==========================================
+        // Modul Cash Flow
+        // ==========================================
+        Route::get('/cashflow', [CashFlowController::class, 'index'])->name('cashflow.index');
+        Route::get('/cashflow/create', [CashFlowController::class, 'create'])->name('cashflow.create');
+        Route::post('/cashflow', [CashFlowController::class, 'store'])->name('cashflow.store');
+        Route::get('/cashflow/{id}/pdf', [CashFlowController::class, 'downloadPDF'])->name('cashflow.pdf');
+        // Route untuk Laporan Cash Flow Bulanan (Format T-Account PDF)
+        Route::get('/cashflow/report-pdf', [CashFlowController::class, 'monthlyReportPDF'])->name('cashflow.report_pdf');
 
-    Route::get('/reports/part-time', [ReportController::class, 'partTimeWages'])->name('reports.part_time');
+        Route::get('/reports/part-time', [ReportController::class, 'partTimeWages'])->name('reports.part_time');
+    });
+
+    // ================= ATTENDANCE =================
+    Route::get('/attendance', [AttendanceController::class, 'index'])->name('attendance.index');
+    Route::post('/attendance/clock-in', [AttendanceController::class, 'clockIn'])->name('attendance.clockIn');
+    Route::post('/attendance/clock-out', [AttendanceController::class, 'clockOut'])->name('attendance.clockOut');
+    Route::get('/attendance/report', [AttendanceController::class, 'report'])->name('attendance.report');
+
+    // ================= LEAVES =================
+    // Own leave applications
+    Route::get('/leaves', [LeaveController::class, 'index'])->name('leaves.index');
+    Route::post('/leaves', [LeaveController::class, 'store'])->name('leaves.store');
+    Route::get('/leaves/{leave}/attachment', [LeaveController::class, 'attachment'])->name('leaves.attachment');
+
+    // Leave management & approvals (Owner & Admin Office)
+    Route::middleware('can:manage-system')->group(function () {
+        Route::get('/leaves/manage', [LeaveController::class, 'manage'])->name('leaves.manage');
+        Route::patch('/leaves/{leave}/status', [LeaveController::class, 'updateStatus'])->name('leaves.updateStatus');
+    });
 });
 
 // Fail laluan pengesahan rasmi Laravel Breeze (Login, Logout, dll)

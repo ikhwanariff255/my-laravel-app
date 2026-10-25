@@ -40,8 +40,8 @@
                             <td class="py-4 px-6 font-bold text-gray-900">{{ $user->name }}</td>
                             <td class="py-4 px-6">{{ $user->email }}</td>
                             <td class="py-4 px-6">
-                                @if($user->role == 'admin')
-                                    <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded">ADMIN</span>
+                                @if($user->role == 'admin_office')
+                                    <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded">ADMIN OFFICE</span>
                                 @elseif($user->role == 'owner')
                                     <span class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded">OWNER</span>
                                 @else

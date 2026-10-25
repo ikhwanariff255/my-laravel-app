@@ -82,7 +82,7 @@
                     @error('role') border-red-500 focus:border-red-500 focus:ring-red-200 bg-red-50 
                     @else border-gray-300 focus:border-blue-500 focus:ring-blue-200 @enderror">
                     <option value="staff" {{ old('role', $user->role) == 'staff' ? 'selected' : '' }}>Staff</option>
-                    <option value="admin" {{ old('role', $user->role) == 'admin' ? 'selected' : '' }}>Admin</option>
+                    <option value="admin_office" {{ old('role', $user->role) == 'admin_office' ? 'selected' : '' }}>Admin Office</option>
                     <option value="owner" {{ old('role', $user->role) == 'owner' ? 'selected' : '' }}>Owner</option>
                 </select>
                 @error('role')
