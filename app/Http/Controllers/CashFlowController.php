@@ -118,7 +118,9 @@ class CashFlowController extends Controller
     {
         $cashflow = CashFlow::with(['user', 'invoice'])->findOrFail($id);
         
-        $pdf = Pdf::loadView('cashflows.pdf', compact('cashflow'));
+        // Cash In manual guna templat gaya invois; Cash Out kekal sebagai Payment Voucher
+        $view = $cashflow->type == 'in' ? 'cashflows.receipt_pdf' : 'cashflows.pdf';
+        $pdf = Pdf::loadView($view, compact('cashflow'));
         $pdf->setPaper('A4', 'portrait');
         
         return $pdf->stream($cashflow->reference_no . '.pdf');
