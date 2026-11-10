@@ -86,6 +86,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/cashflow/{id}/pdf', [CashFlowController::class, 'downloadPDF'])->name('cashflow.pdf');
         // Route untuk Laporan Cash Flow Bulanan (Format T-Account PDF)
         Route::get('/cashflow/report-pdf', [CashFlowController::class, 'monthlyReportPDF'])->name('cashflow.report_pdf');
+        // Butiran transaksi (read-only) & paparan bukti/resit
+        Route::get('/cashflow/{id}', [CashFlowController::class, 'show'])->whereNumber('id')->name('cashflow.show');
+        Route::get('/cashflow/{id}/receipt', [CashFlowController::class, 'receipt'])->whereNumber('id')->name('cashflow.receipt');
 
         Route::get('/reports/part-time', [ReportController::class, 'partTimeWages'])->name('reports.part_time');
     });

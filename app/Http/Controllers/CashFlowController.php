@@ -6,6 +6,7 @@ use App\Models\CashFlow;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class CashFlowController extends Controller
@@ -89,6 +90,27 @@ class CashFlowController extends Controller
         ]);
 
         return redirect()->route('cashflow.index')->with('success', 'Transaksi aliran tunai manual berjaya direkodkan!');
+    }
+
+    // Paparan butiran satu transaksi (read-only)
+    public function show($id)
+    {
+        $cashflow = CashFlow::with(['user', 'invoice.details'])->findOrFail($id);
+
+        $receiptExists = $cashflow->receipt && Storage::disk('public')->exists($cashflow->receipt);
+        $receiptIsPdf = $receiptExists && strtolower(pathinfo($cashflow->receipt, PATHINFO_EXTENSION)) === 'pdf';
+
+        return view('cashflows.show', compact('cashflow', 'receiptExists', 'receiptIsPdf'));
+    }
+
+    // Papar fail bukti/resit melalui controller (perlu login, tidak bergantung pada storage:link)
+    public function receipt($id)
+    {
+        $cashflow = CashFlow::findOrFail($id);
+
+        abort_unless($cashflow->receipt && Storage::disk('public')->exists($cashflow->receipt), 404);
+
+        return Storage::disk('public')->response($cashflow->receipt);
     }
 
     // 4. Download PDF (Resit Manual / Baucar)

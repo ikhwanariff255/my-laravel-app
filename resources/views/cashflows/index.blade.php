@@ -116,7 +116,12 @@
                             {{ \Carbon\Carbon::parse($cf->date)->format('d M Y') }}
                         </td>
                         <td class="px-6 py-4 font-bold text-gray-700 whitespace-nowrap">
-                            {{ $cf->reference_no ?? 'N/A' }}
+                            <a href="{{ route('cashflow.show', $cf->id) }}" class="text-blue-600 hover:text-blue-800 hover:underline" title="View transaction details">
+                                {{ $cf->reference_no ?? 'N/A' }}
+                            </a>
+                            @if($cf->receipt)
+                                <i class="fas fa-paperclip text-xs text-gray-400 ml-1" title="Evidence attached"></i>
+                            @endif
                             <div class="text-xs text-gray-400 font-normal mt-0.5">{{ $cf->category }}</div>
                         </td>
                         <td class="px-6 py-4 text-gray-700 min-w-[250px]">
